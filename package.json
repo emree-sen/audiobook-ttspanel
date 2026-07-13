@@ -1,0 +1,22 @@
+{
+  "name": "webnovel-tts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "vitest run",
+    "generate": "tsx src/cli/generate.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.9.0",
+    "ffmpeg-static": "^5.2.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^20.14.0"
+  }
+}
