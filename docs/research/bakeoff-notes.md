@@ -20,6 +20,11 @@
 - Adapter **swappable** kalır; Azure MAI-Voice-2 / Chirp 3 HD yedek olarak durur.
 - **Maliyet:** 3.1, 2.5'in ~2 katı ($1/1M metin + $20/1M ses). Cost modülü model-farkında hale getirildi (`computeGeminiCost(..., model)`). Faz 1 (akış) düşük hacimde önemsiz; Faz 2 dev arşivde bu 2x fark hesaba katılmalı — gerekirse o noktada 2.5 batch / Chirp yeniden değerlendirilir.
 
+## Gerçek-bölüm testi bulguları (2026-07-13)
+- **RPM rate limit:** 3.1 preview tier'ında hızlı ardışık çağrılar dakikalık limite takılıyor (boş yanıt / 429). → adapter'a throttle (6s) eklendi. Hacim için darboğaz; tier/kota netleştirilmeli veya Cloud TTS/Vertex.
+- **Kırılgan stil prompt'ları:** bazı stil talimatları (ör. "Style: nötr.") modeli sessizce boş yanıta itiyor. → adapter'a stilli→düz metin fallback eklendi.
+- **Prototip kararı:** kullanıcı şimdilik **tek anlatıcı ses** istiyor (çoklu ses ertelendi). CLI `--single-voice gemini:Charon` ile.
+
 ## Açık / ileride
-- Puck (Kaan) sesi ve bazı karakterler için alternatif ses denemeleri yapılabilir (ses seçimi içerik kararı).
+- Çoklu ses ileride geri açılabilir (mimari destekliyor); ses seçimi içerik kararı.
 - Pace/telaffuz ince ayarı ileride style promptu ile güçlendirilebilir.

@@ -6,6 +6,7 @@ import { generateEpisode } from '../core/orchestrator.js';
 import { MockAdapter } from '../core/tts/mock.js';
 import { GeminiAdapter } from '../core/tts/gemini.js';
 import { formatUsd } from '../core/cost.js';
+import { overrideAllVoices } from '../core/voices.js';
 import type { TtsAdapter } from '../core/types.js';
 
 function arg(name: string, def?: string): string | undefined {
@@ -19,7 +20,9 @@ async function main() {
   const outDir = arg('--out', '.')!;
   const provider = arg('--provider', 'gemini')!;
 
-  const script = parseScript(JSON.parse(await readFile(scriptPath, 'utf8')));
+  const raw = parseScript(JSON.parse(await readFile(scriptPath, 'utf8')));
+  const singleVoice = arg('--single-voice');
+  const script = singleVoice ? overrideAllVoices(raw, singleVoice) : raw;
   let adapter: TtsAdapter;
   if (provider === 'mock') adapter = new MockAdapter();
   else {

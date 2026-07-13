@@ -18,3 +18,9 @@ export function validateSpeakers(script: VoiceoverScript): void {
     if (!known.has(seg.speaker)) throw new Error(`Segment ${seg.id}: bilinmeyen konuşmacı "${seg.speaker}"`);
   }
 }
+
+// Prototip / tek-anlatıcı modu: tüm kadronun sesini tek bir sese çevirir.
+export function overrideAllVoices(script: VoiceoverScript, voiceId: string): VoiceoverScript {
+  parseVoiceId(voiceId); // format doğrulaması (geçersizse fırlatır)
+  return { ...script, cast: script.cast.map((c) => ({ ...c, voiceId })) };
+}
