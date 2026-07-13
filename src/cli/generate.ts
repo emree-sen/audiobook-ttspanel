@@ -40,7 +40,11 @@ async function main() {
   await writeFile(outPath, r.mp3);
 
   for (const s of r.segments) console.log(`  [${s.id}] ${s.speaker.padEnd(10)} ${Math.round(s.durationMs)}ms  ${formatUsd(s.usd)}`);
+  if (r.failed.length) {
+    console.log(`\n⚠ ${r.failed.length} segment üretilemedi (atlandı):`);
+    for (const f of r.failed) console.log(`  [${f.id}] ${f.error}`);
+  }
   console.log(`\n✓ ${outPath}`);
-  console.log(`Toplam: ${(r.totalDurationMs / 1000).toFixed(1)}sn ses, maliyet ${formatUsd(r.totalUsd)}`);
+  console.log(`Toplam: ${(r.totalDurationMs / 1000).toFixed(1)}sn ses (${r.segments.length}/${r.segments.length + r.failed.length} segment), maliyet ${formatUsd(r.totalUsd)}`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
