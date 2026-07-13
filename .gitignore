@@ -29,6 +29,9 @@ yarn-error.log*
 # Local/generated voiceover scripts (may contain copyrighted source text)
 /scripts/
 
+# Paylaşılan örnek ses kayıtları (SADECE private repo, kişisel kullanım) — *.mp3 ignore'una istisna
+!/samples/*.mp3
+
 # Local debug scratch
 debug-*.ts
 
