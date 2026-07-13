@@ -25,7 +25,7 @@ async function main() {
   else {
     const key = process.env.GEMINI_API_KEY;
     if (!key) { console.error('GEMINI_API_KEY tanımlı değil (.env)'); process.exit(1); }
-    adapter = new GeminiAdapter(key);
+    adapter = new GeminiAdapter(key, arg('--model'));
   }
 
   console.log(`Üretiliyor: ${script.title} (${script.segments.length} segment) — provider: ${adapter.id}`);

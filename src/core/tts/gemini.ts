@@ -15,9 +15,12 @@ export function buildPrompt(req: TtsSegmentRequest): string {
 }
 
 export class GeminiAdapter implements TtsAdapter {
-  readonly id = 'gemini-2.5-flash-tts';
+  readonly id: string;
+  readonly model: string;
   private ai: GoogleGenAI;
-  constructor(apiKey: string, private model = 'gemini-2.5-flash-preview-tts') {
+  constructor(apiKey: string, model = 'gemini-3.1-flash-tts-preview') {
+    this.model = model;
+    this.id = `gemini:${model}`;
     this.ai = new GoogleGenAI({ apiKey });
   }
   async synthesize(req: TtsSegmentRequest): Promise<TtsResult> {
@@ -40,7 +43,7 @@ export class GeminiAdapter implements TtsAdapter {
     return {
       audio: pcmToWav(pcm), format: 'wav',
       durationMs: audioTokensToMs(audioTokens),
-      cost: computeGeminiCost(textTokens, audioTokens),
+      cost: computeGeminiCost(textTokens, audioTokens, this.model),
     };
   }
 }
