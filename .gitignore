@@ -22,8 +22,15 @@ yarn-error.log*
 
 # Audio artifacts (generated; not committed)
 /audio-out/
+/bakeoff/
 *.mp3
 *.wav
+
+# Local/generated voiceover scripts (may contain copyrighted source text)
+/scripts/
+
+# Local debug scratch
+debug-*.ts
 
 # OS / editor
 .DS_Store
