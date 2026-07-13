@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "series": "Gölge Hükümdarı", "season": 1, "episode": 1,
+  "title": "Bake-off Testi", "language": "tr-TR",
+  "cast": [
+    { "character_id": "narrator", "display_name": "Anlatıcı", "voice_id": "gemini:Charon", "base_style": "sakin, ölçülü, üçüncü şahıs anlatım" },
+    { "character_id": "kaan", "display_name": "Kaan", "voice_id": "gemini:Puck", "base_style": "genç, kararlı erkek" },
+    { "character_id": "elara", "display_name": "Elara", "voice_id": "gemini:Kore", "base_style": "kadın, bilge" }
+  ],
+  "segments": [
+    { "id": "s1", "speaker": "narrator", "type": "narration", "text": "Zindanın kapısı, Aztharion'un adı fısıldanırken gıcırdayarak açıldı.", "style": "gizemli, yavaş", "pause_after_ms": 400 },
+    { "id": "s2", "speaker": "kaan", "type": "dialogue", "text": "Kim var orada? Yaklaşma, seni uyarıyorum!", "style": "korkmuş ama meydan okuyan", "tags": ["[scared]"] },
+    { "id": "s3", "speaker": "elara", "type": "dialogue", "text": "Sakin ol, çocuk. Sana zarar vermeye gelmedim.", "style": "sakin, güven veren, hafif alaycı", "pause_after_ms": 300 },
+    { "id": "s4", "speaker": "kaan", "type": "dialogue", "text": "O zaman neden buradasın?!", "style": "öfkeli, yüksek sesle", "tags": ["[shouting]"] },
+    { "id": "s5", "speaker": "narrator", "type": "narration", "text": "Elara gülümsedi ve gölgelerin arasından bir adım öne çıktı." }
+  ],
+  "pronunciations": [ { "term": "Aztharion", "say_as": "Az-ta-ri-on" } ]
+}
