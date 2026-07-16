@@ -20,6 +20,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Panel verisi (SQLite + üretilen sesler) — asla commit edilmez
+/data/
+
 # Audio artifacts (generated; not committed)
 /audio-out/
 /bakeoff/

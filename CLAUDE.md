@@ -19,27 +19,37 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 
 | Konu | Karar |
 |---|---|
-| Barındırma | **Supabase Cloud** (Postgres·Auth·Storage) + Next.js app & Node/TS worker kullanıcının **VPS**'inde |
+| Barındırma | **Self-host**: Next.js + SQLite (Drizzle) + yerel disk; tek-sahip auth (PANEL_PASSWORD). Public repo, BYO-key. ~~Supabase Cloud~~ (2026-07-16'da değişti) |
 | Dil | Türkçe birincil, İngilizce ikincil |
 | TTS motoru | **Gemini 3.1 Flash TTS Preview** (`gemini-3.1-flash-tts-preview`) — bake-off'ta seçildi (2.5 robotik bulundu) |
 | Adapter | **Provider-agnostic** (Chirp 3 HD / Azure / ElevenLabs swappable) |
 | İstemci | Responsive web + **PWA** (panel + oynatıcı tek kod) |
-| Analiz akışı | Panel: raw_text → Claude JSON script → import (Faz 1 elle; Faz 2 otomatik) |
+| Analiz akışı | Panel: raw_text → **LLM annotation panel içinde otomatik** (provider-agnostic, Dilim B) → script; elle JSON yapıştırma da destekli |
 
-## Ne yapıldı / ne kaldı (Faz 1, 5 plana bölündü)
+## Ne yapıldı / ne kaldı
 
-- ✅ **Plan ① — Audio Core + Bake-off CLI** (`docs/superpowers/plans/2026-07-13-milestone-0-audio-core.md`): saf TS çekirdek — zod şema, TTS adapter (Gemini + Mock), ffmpeg birleştirme, orkestratör, CLI. **23 test yeşil.** Bake-off ile motor ampirik seçildi.
-- ⬜ **Plan ② — Supabase Backend** (şema, RLS, Storage, veri katmanı) — SONRAKİ. Kullanıcının Supabase projesi/kimlik bilgileri gerekir.
-- ⬜ **Plan ③ — Worker Pipeline** (Postgres job kuyruğu, üretim, content-hash cache, maliyet, retry).
-- ⬜ **Plan ④ — Panel** (auth, CRUD, script import, ses registry, üretim hattı monitörü).
-- ⬜ **Plan ⑤ — Oynatıcı (PWA)** (kütüphane, playback, resume, MediaSession, offline).
+- ✅ **Plan ① — Audio Core + Bake-off CLI**: saf TS çekirdek — zod şema, TTS adapter (Gemini + Mock), ffmpeg birleştirme, orkestratör, CLI. 23 test yeşil.
+- ✅ **Dilim A — Panel iskeleti + veri katmanı + dikey dilim** (`docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-a.md`): Next.js panel, SQLite (Drizzle), tek-sahip auth, proje/bölüm CRUD, elle script import, mock/gemini ile üretim + SSE ilerleme + dinleme.
+- ⬜ **Dilim B — LLM annotation**: provider-agnostic LLM adapter (Claude/GPT), ham metin + anlatım tarzı → chunk'lama → script; chunk ilerleme UI; script düzenle & yeniden üret. SONRAKİ.
+- ⬜ **Dilim C — TTS üretim hattı**: DB-backed kuyruk, content-hash cache, maliyet, RPM/RPD ilerleme, tek-segment yeniden üretme + segment-başı ses dosyaları.
+- ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline.
 
-## Nasıl çalıştırılır (Plan ①)
+## Nasıl çalıştırılır
+
+### Panel
 
 ```bash
 npm install
-npm test                       # vitest, 23 test
+cp .env.example .env   # GEMINI_API_KEY + PANEL_PASSWORD
+npm run dev            # http://localhost:3000  (test: TTS_PROVIDER=mock)
+npm test               # vitest (çekirdek + panel testleri)
+```
 
+Veri: `./data/` (SQLite `app.db` + `audio/`); git-ignore'da.
+
+### CLI
+
+```bash
 # .env oluştur:  GEMINI_API_KEY=<anahtar>
 # Bir JSON scriptten mp3 üret:
 npx tsx src/cli/generate.ts <script.json> --out ./out --provider gemini
@@ -69,4 +79,4 @@ npx tsx src/cli/generate.ts <script.json> --out ./out --provider mock
 
 ## Sonraki oturum için öneri
 
-Plan ②'yi yazmaya (writing-plans) geçmeden önce kullanıcının Supabase projesi + kimlik bilgilerini iste. Ayrıca Faz 2 hacim planı için RPM/kota konusunu netleştir.
+Dilim B (LLM annotation) için brainstorming/writing-plans: provider-agnostic LLM adapter, chunk'lama stratejisi, anlatım tarzı → sistem prompt tasarımı. RPD kotası hâlâ kritik (bkz. Bilinen kısıtlar #1) — hacim öncesi faturalamalı Gemini anahtarı veya Chirp adapter gündemde.
