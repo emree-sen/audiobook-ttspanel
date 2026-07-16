@@ -1,9 +1,8 @@
-import { desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { deleteChapter, getChapter, updateChapter } from '@/lib/services/chapters';
 import { latestScript, listSegments } from '@/lib/services/scripts';
-import { renders } from '@/lib/db/schema';
+import { listRenders } from '@/lib/services/generation';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,12 +13,11 @@ export async function GET(_req: Request, { params }: Ctx) {
   if (!chapter) return NextResponse.json({ error: 'Bölüm bulunamadı' }, { status: 404 });
   const scr = latestScript(db, id);
   const segments = scr ? listSegments(db, scr.id) : [];
-  const renderRows = db.select().from(renders).where(eq(renders.chapterId, id)).orderBy(desc(renders.createdAt)).all();
   return NextResponse.json({
     chapter,
     script: scr ? { id: scr.id, version: scr.version, segmentCount: segments.length } : null,
     segments,
-    renders: renderRows,
+    renders: listRenders(db, id),
   });
 }
 
