@@ -61,12 +61,17 @@ export default function ChapterPage() {
 
   async function generate() {
     setGenState({ busy: true, done: 0, total: detail?.script?.segmentCount ?? 0, err: '' });
-    await streamGenerate(id, (ev, data) => {
-      if (ev === 'progress') setGenState((s) => ({ ...s, done: data.done, total: data.total }));
-      if (ev === 'error') setGenState((s) => ({ ...s, err: data.message }));
-    });
-    setGenState((s) => ({ ...s, busy: false }));
-    load();
+    try {
+      await streamGenerate(id, (ev, data) => {
+        if (ev === 'progress') setGenState((s) => ({ ...s, done: data.done, total: data.total }));
+        if (ev === 'error') setGenState((s) => ({ ...s, err: data.message }));
+      });
+    } catch (e) {
+      setGenState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
+    } finally {
+      setGenState((s) => ({ ...s, busy: false }));
+      load();
+    }
   }
 
   if (!detail) return <p className="muted">Yükleniyor…</p>;

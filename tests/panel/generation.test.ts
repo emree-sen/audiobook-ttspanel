@@ -78,6 +78,10 @@ describe('generateChapter (mock adapter)', () => {
     await expect(generateChapter(db, chapterId, broken)).rejects.toThrow();
     expect(getChapter(db, chapterId)?.status).toBe('error');
     expect(listRenders(db, chapterId)).toHaveLength(0);
+
+    const segs = listSegments(db, latestScript(db, chapterId)!.id);
+    expect(segs.every((s) => s.status === 'failed')).toBe(true);
+    expect(segs.every((s) => s.error?.match(/patladı/))).toBe(true);
   });
 
   test('single_voice ayarı tüm segment seslerini değiştirir (mock üstünden gözlem)', async () => {
