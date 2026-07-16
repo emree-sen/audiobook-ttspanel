@@ -29,6 +29,17 @@ export default function ProjectPage() {
     await fetch(`/api/chapters/${chapterId}`, { method: 'DELETE' }); load();
   }
 
+  async function move(idx: number, dir: -1 | 1) {
+    const list = detail!.chapters;
+    const a = list[idx], b = list[idx + dir];
+    if (!b) return;
+    await Promise.all([
+      fetch(`/api/chapters/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: b.position }) }),
+      fetch(`/api/chapters/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: a.position }) }),
+    ]);
+    load();
+  }
+
   if (!detail) return <p className="muted">Yükleniyor…</p>;
   return (
     <>
@@ -38,10 +49,12 @@ export default function ProjectPage() {
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Yeni bölüm adı" />
         <button type="submit">Ekle</button>
       </form>
-      {detail.chapters.map((c) => (
+      {detail.chapters.map((c, i) => (
         <div key={c.id} className="card row" style={{ justifyContent: 'space-between' }}>
           <Link href={`/chapters/${c.id}`}><strong>{c.position}. {c.title}</strong></Link>
           <span className="row">
+            <button className="ghost" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+            <button className="ghost" onClick={() => move(i, 1)} disabled={i === detail.chapters.length - 1}>↓</button>
             <span className={`badge ${c.status}`}>{c.status}</span>
             <button className="danger" onClick={() => remove(c.id)}>Sil</button>
           </span>

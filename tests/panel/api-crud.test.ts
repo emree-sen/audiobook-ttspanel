@@ -56,6 +56,23 @@ describe('API CRUD', () => {
     expect(cd.renders).toEqual([]);
   });
 
+  test('bölüm PATCH position günceller (sıralama)', async () => {
+    const p = await (await projectsRoute.POST(jsonReq('POST', { title: 'R' }))).json();
+    const c1 = await (await projChaptersRoute.POST(jsonReq('POST', { title: 'B1' }), ctx(p.id))).json();
+    const c2 = await (await projChaptersRoute.POST(jsonReq('POST', { title: 'B2' }), ctx(p.id))).json();
+    expect(c1.position).toBe(1);
+    expect(c2.position).toBe(2);
+
+    // sırayı takas et (c1 -> 2, c2 -> 1)
+    await chapterRoute.PATCH(jsonReq('PATCH', { position: c2.position }), ctx(c1.id));
+    await chapterRoute.PATCH(jsonReq('PATCH', { position: c1.position }), ctx(c2.id));
+
+    const pd = await (await projectRoute.GET(jsonReq('GET'), ctx(p.id))).json();
+    expect(pd.chapters.map((c: { id: string; position: number }) => c.id)).toEqual([c2.id, c1.id]);
+    expect(pd.chapters[0].position).toBe(1);
+    expect(pd.chapters[1].position).toBe(2);
+  });
+
   test('geçersiz script 400 + Türkçe hata', async () => {
     const p = await (await projectsRoute.POST(jsonReq('POST', { title: 'R' }))).json();
     const c = await (await projChaptersRoute.POST(jsonReq('POST', { title: 'B' }), ctx(p.id))).json();

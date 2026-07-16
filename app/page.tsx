@@ -23,6 +23,13 @@ export default function ProjectsPage() {
     await fetch(`/api/projects/${id}`, { method: 'DELETE' }); load();
   }
 
+  async function rename(p: Project) {
+    const title = prompt('Yeni proje adı:', p.title);
+    if (!title?.trim() || title === p.title) return;
+    await fetch(`/api/projects/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.trim() }) });
+    load();
+  }
+
   return (
     <>
       <h1>Projeler</h1>
@@ -33,7 +40,10 @@ export default function ProjectsPage() {
       {projects.map((p) => (
         <div key={p.id} className="card row" style={{ justifyContent: 'space-between' }}>
           <Link href={`/projects/${p.id}`}><strong>{p.title}</strong></Link>
-          <button className="danger" onClick={() => remove(p.id)}>Sil</button>
+          <span className="row">
+            <button className="ghost" onClick={() => rename(p)}>Yeniden adlandır</button>
+            <button className="danger" onClick={() => remove(p.id)}>Sil</button>
+          </span>
         </div>
       ))}
       {projects.length === 0 && <p className="muted">Henüz proje yok. Yukarıdan ekle.</p>}
