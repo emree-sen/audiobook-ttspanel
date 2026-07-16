@@ -1,0 +1,20 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #14151a; color: #e8e8ea; }
+a { color: #7db4ff; text-decoration: none; }
+.topbar { padding: 0.7rem 1.2rem; border-bottom: 1px solid #2a2c33; font-weight: 600; }
+.container { max-width: 60rem; margin: 0 auto; padding: 1.2rem; }
+h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; }
+input, textarea, select { width: 100%; padding: 0.45rem; border: 1px solid #3a3d46; border-radius: 6px; background: #1d1f26; color: inherit; font: inherit; }
+textarea { min-height: 8rem; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+button { padding: 0.45rem 0.9rem; border: 0; border-radius: 6px; background: #3b82f6; color: #fff; font: inherit; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+button.danger { background: #b33; } button.ghost { background: #2a2c33; }
+.card { border: 1px solid #2a2c33; border-radius: 8px; padding: 0.9rem; margin: 0.6rem 0; background: #191b21; }
+.row { display: flex; gap: 0.6rem; align-items: center; }
+.muted { color: #9a9ca6; font-size: 0.85rem; }
+.err { color: #f88; white-space: pre-wrap; font-size: 0.85rem; }
+.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #2a2c33; }
+.badge.done { background: #14532d; } .badge.error, .badge.failed { background: #7f1d1d; } .badge.generating { background: #1e3a8a; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+td, th { padding: 0.35rem 0.5rem; border-bottom: 1px solid #2a2c33; text-align: left; }
+progress { width: 100%; }
