@@ -133,6 +133,23 @@ describe('runJob', () => {
     await runJob(db, enqueueJob(db, chapterId).id, spy);
     expect(new Set(seen)).toEqual(new Set(['Charon']));
   });
+
+  test('koşu sırasında iptal: kota harcaması durur, iş done\'a dirilmez', async () => {
+    const { db, chapterId } = setup();
+    const job = enqueueJob(db, chapterId);
+    const inner = new MockAdapter();
+    let n = 0;
+    const cancelling: TtsAdapter = {
+      id: 'cancelling',
+      async synthesize(req: TtsSegmentRequest): Promise<TtsResult> {
+        if (++n === 2) enqueueJob(db, chapterId); // yeni iş eskisini canceled yapar
+        return inner.synthesize(req);
+      },
+    };
+    await runJob(db, job.id, cancelling);
+    expect(db.select().from(jobs).where(eq(jobs.id, job.id)).get()?.status).toBe('canceled');
+    expect(n).toBeLessThanOrEqual(2); // iptalden sonra çağrı yok
+  });
 });
 
 describe('recover + worker', () => {

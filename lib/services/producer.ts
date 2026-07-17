@@ -88,6 +88,9 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
     let callsUsed = job.callsUsed;
     let doneCount = rows.filter((r) => r.status === 'done').length;
     for (const row of rows) {
+      // Dışarıdan iptal edildiyse (yeni enqueue) kota harcamayı bırak; işi olduğu gibi bırak.
+      const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get();
+      if (!fresh || fresh.status !== 'running') return;
       if (row.status === 'done') continue;
       const item = plan[row.idx];
       const cached = db.select().from(audioCache).where(eq(audioCache.hash, item.hash)).get();

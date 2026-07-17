@@ -23,7 +23,7 @@ jobs:        id pk · chapter_id fk(cascade) · script_id fk(cascade) · status 
 tts_calls:   id pk · provider text · model text · day text ("YYYY-MM-DD", sağlayıcının sıfırlanma dilimine göre)
              · segment_id text null · ok int (0/1) · usd real default 0 · created_at
              · index (provider, day)
-audio_cache: hash pk (sha256: provider|model|voice|style|language|text) · path text (audioDir'e göreli)
+audio_cache: hash pk (sha256: provider|model|voice|style|tags|language|text) · path text (audioDir'e göreli)
              · duration_ms real · usd real · created_at
 ```
 
