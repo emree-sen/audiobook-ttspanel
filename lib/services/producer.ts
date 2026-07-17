@@ -153,6 +153,10 @@ let workerPromise: Promise<void> | null = null;
 export function ensureWorker(db: Db): Promise<void> {
   if (workerPromise) return workerPromise;
   workerPromise = (async () => {
+    await Promise.resolve(); // dış atama tamamlanmadan iç mantık başlamasın — yoksa kuyrukta iş bulunamayınca
+    // (hiç await'e uğramadan) fonksiyon senkron biter; finally'deki sıfırlama, dıştaki atamadan ÖNCE
+    // çalışıp hemen ezilir ve workerPromise sonsuza dek "ölü" bir promise'e saplanır (bir sonraki
+    // ensureWorker çağrısı o promise'e katılır ve HİÇBİR İŞ YAPMADAN anında döner).
     try {
       recoverJobs(db);
       for (;;) {
