@@ -31,6 +31,7 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 - ✅ **Plan ① — Audio Core + Bake-off CLI**: saf TS çekirdek — zod şema, TTS adapter (Gemini + Mock), ffmpeg birleştirme, orkestratör, CLI. 23 test yeşil.
 - ✅ **Dilim A — Panel iskeleti + veri katmanı + dikey dilim** (`docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-a.md`): Next.js panel, SQLite (Drizzle), tek-sahip auth, proje/bölüm CRUD, elle script import, mock/gemini ile üretim + SSE ilerleme + dinleme.
 - ✅ **Dilim B — LLM annotation** (`docs/superpowers/specs/2026-07-16-panel-slice-b-llm-annotation-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-b-llm-annotation.md`): provider-agnostic LLM adapter (Gemini + Mock), ses modu (tek anlatıcı / çok karakterli + maks. karakter), chunk'lama + zod-retry, ses havuzundan otomatik atama, ek talimatla yeniden üretme, cast ses düzeltme, usage/token kaydı.
+- ✅ **UI Redesign — koyu stüdyo** (`docs/superpowers/specs/2026-07-17-panel-ui-redesign-design.md`): token sistemi, Manrope+JetBrains Mono (next/font), dalga-formu marka + eşitleyici animasyon, inline SVG ikonlar, ConfirmButton/EmptyState, 4 sayfa yeniden giydirildi. Davranış/API değişmedi.
 - ⬜ **Dilim C — TTS üretim hattı**: DB-backed kuyruk, content-hash cache, maliyet, RPM/RPD ilerleme, tek-segment yeniden üretme + segment-başı ses dosyaları. SONRAKİ.
 - ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline.
 
