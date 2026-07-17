@@ -15,11 +15,13 @@ export async function GET(_req: Request, { params }: Ctx) {
   const segments = scr ? listSegments(db, scr.id) : [];
   let cast: unknown[] = [];
   if (scr) { try { cast = JSON.parse(scr.json).cast ?? []; } catch { /* bozuk json'u yok say */ } }
+  let usage: unknown = null;
+  if (scr?.usageJson) { try { usage = JSON.parse(scr.usageJson); } catch { /* bozuk json'u yok say */ } }
   return NextResponse.json({
     chapter,
     script: scr ? {
       id: scr.id, version: scr.version, segmentCount: segments.length,
-      source: scr.source, usage: scr.usageJson ? JSON.parse(scr.usageJson) : null,
+      source: scr.source, usage,
     } : null,
     cast,
     segments,
