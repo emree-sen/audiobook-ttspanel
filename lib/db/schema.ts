@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Gizli-olmayan varsayılanlar: provider, model, single_voice, default_voice
 export const settings = sqliteTable('settings', {
@@ -61,5 +61,39 @@ export const renders = sqliteTable('renders', {
   scriptId: text('script_id').notNull().references(() => scripts.id, { onDelete: 'cascade' }),
   path: text('path').notNull(), // audioDir()'e GÖRELİ yol: "<chapterId>/<renderId>.mp3"
   durationSec: real('duration_sec'),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const jobs = sqliteTable('jobs', {
+  id: text('id').primaryKey(),
+  chapterId: text('chapter_id').notNull().references(() => chapters.id, { onDelete: 'cascade' }),
+  scriptId: text('script_id').notNull().references(() => scripts.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('queued'), // queued|running|done|error|canceled
+  limitCalls: integer('limit_calls'),                 // kısmi üretim tavanı (null=sınırsız)
+  callsUsed: integer('calls_used').notNull().default(0),
+  doneCount: integer('done_count').notNull().default(0),
+  totalCount: integer('total_count').notNull(),
+  pausedReason: text('paused_reason'),                // quota|limit (status=queued iken duraklama nedeni)
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const ttsCalls = sqliteTable('tts_calls', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  model: text('model').notNull().default(''),
+  day: text('day').notNull(), // sağlayıcının sıfırlanma dilimine göre "YYYY-MM-DD"
+  segmentId: text('segment_id'),
+  ok: integer('ok').notNull().default(1),
+  usd: real('usd').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('tts_calls_provider_day').on(t.provider, t.day)]);
+
+export const audioCache = sqliteTable('audio_cache', {
+  hash: text('hash').primaryKey(), // sha256: provider|model|voice|style|tags|language|text
+  path: text('path').notNull(),    // audioDir'e göreli: "segments/<hash>.wav"
+  durationMs: real('duration_ms').notNull().default(0),
+  usd: real('usd').notNull().default(0),
   createdAt: integer('created_at').notNull(),
 });

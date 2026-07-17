@@ -15,6 +15,13 @@
       "when": 1784267470009,
       "tag": "0001_narrow_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784293168686,
+      "tag": "0002_familiar_firelord",
+      "breakpoints": true
     }
   ]
 }
