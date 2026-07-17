@@ -32,35 +32,31 @@ describe('safeAudioPath', () => {
   });
 });
 
-describe('generate SSE + audio servis', () => {
-  test('mock provider ile uçtan uca: SSE progress+done, mp3 servis edilir', async () => {
+describe('generate: kuyruğa alma (202)', () => {
+  // NOT: eski SSE sözleşmesinin yerini aldı; producer.test.ts davranış sözleşmesini kapsıyor.
+  // Task 5, generate rotasının tam yeni test paketini yazacak (bu placeholder geçicidir).
+  test('scripti olan bölümde 202 + jobId döner', async () => {
     setSetting(db, 'provider', 'mock');
     const p = createProject(db, { title: 'R' });
     const c = createChapter(db, p.id, { title: 'B' });
     importScript(db, c.id, FIXTURE);
 
     const res = await generateRoute.POST(new Request('http://p', { method: 'POST' }), ctx({ id: c.id }));
-    expect(res.headers.get('content-type')).toContain('text/event-stream');
-    const body = await new Response(res.body).text();
-    expect(body).toContain('event: progress');
-    expect(body).toContain('event: done');
-
-    const renderPath = JSON.parse(/event: done\ndata: (.*)/.exec(body)![1]).renderPath as string;
-    const audio = await audioRoute.GET(new Request('http://p'), ctx({ path: renderPath.split('/') }));
-    expect(audio.status).toBe(200);
-    expect(audio.headers.get('content-type')).toBe('audio/mpeg');
+    expect(res.status).toBe(202);
+    const out = await res.json();
+    expect(out.jobId).toEqual(expect.any(String));
   });
 
-  test('script yoksa SSE error olayı', async () => {
+  test('script yoksa 400', async () => {
     setSetting(db, 'provider', 'mock');
     const p = createProject(db, { title: 'R' });
     const c = createChapter(db, p.id, { title: 'B' });
     const res = await generateRoute.POST(new Request('http://p', { method: 'POST' }), ctx({ id: c.id }));
-    const body = await new Response(res.body).text();
-    expect(body).toContain('event: error');
-    expect(body).toContain('script');
+    expect(res.status).toBe(400);
   });
+});
 
+describe('audio servis', () => {
   test('audio: traversal 404', async () => {
     const res = await audioRoute.GET(new Request('http://p'), ctx({ path: ['..', 'app.db'] }));
     expect(res.status).toBe(404);
