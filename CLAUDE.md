@@ -6,7 +6,7 @@
 
 Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-sesli** seslendiren, üretim hattı panelli + PWA oynatıcılı, kendi VPS'inde barınan bir **sesli-kitap üretim & dinleme sistemi.**
 
-**Kilit iş bölümü:** Ham bölüm metni → **Claude (oturum içinde, elle) yapılandırılmış bir JSON "seslendirme scripti" üretir** (segment + konuşan + duygu/stil + ses) → sistem TTS + birleştirme + oynatma yapar. Otomatik hatta LLM yok; ileride annotator otomatikleşecek (aynı JSON şeması sözleşme).
+**Kilit iş bölümü:** Ham bölüm metni → **panel içinde LLM annotation** (Dilim B: Gemini, provider-agnostic adapter) yapılandırılmış bir JSON "seslendirme scripti" üretir (segment + konuşan + duygu/stil + ses) → sistem TTS + birleştirme + oynatma yapar. Elle JSON yapıştırma fallback olarak durur (aynı JSON şeması sözleşme).
 
 ## Kullanıcı tercihleri (önemli)
 
@@ -30,8 +30,8 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 
 - ✅ **Plan ① — Audio Core + Bake-off CLI**: saf TS çekirdek — zod şema, TTS adapter (Gemini + Mock), ffmpeg birleştirme, orkestratör, CLI. 23 test yeşil.
 - ✅ **Dilim A — Panel iskeleti + veri katmanı + dikey dilim** (`docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-a.md`): Next.js panel, SQLite (Drizzle), tek-sahip auth, proje/bölüm CRUD, elle script import, mock/gemini ile üretim + SSE ilerleme + dinleme.
-- ⬜ **Dilim B — LLM annotation**: provider-agnostic LLM adapter (Claude/GPT), ham metin + anlatım tarzı → chunk'lama → script; chunk ilerleme UI; script düzenle & yeniden üret. SONRAKİ.
-- ⬜ **Dilim C — TTS üretim hattı**: DB-backed kuyruk, content-hash cache, maliyet, RPM/RPD ilerleme, tek-segment yeniden üretme + segment-başı ses dosyaları.
+- ✅ **Dilim B — LLM annotation** (`docs/superpowers/specs/2026-07-16-panel-slice-b-llm-annotation-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-b-llm-annotation.md`): provider-agnostic LLM adapter (Gemini + Mock), ses modu (tek anlatıcı / çok karakterli + maks. karakter), chunk'lama + zod-retry, ses havuzundan otomatik atama, ek talimatla yeniden üretme, cast ses düzeltme, usage/token kaydı.
+- ⬜ **Dilim C — TTS üretim hattı**: DB-backed kuyruk, content-hash cache, maliyet, RPM/RPD ilerleme, tek-segment yeniden üretme + segment-başı ses dosyaları. SONRAKİ.
 - ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline.
 
 ## Nasıl çalıştırılır
@@ -79,4 +79,4 @@ npx tsx src/cli/generate.ts <script.json> --out ./out --provider mock
 
 ## Sonraki oturum için öneri
 
-Dilim B (LLM annotation) için brainstorming/writing-plans: provider-agnostic LLM adapter, chunk'lama stratejisi, anlatım tarzı → sistem prompt tasarımı. RPD kotası hâlâ kritik (bkz. Bilinen kısıtlar #1) — hacim öncesi faturalamalı Gemini anahtarı veya Chirp adapter gündemde.
+Dilim C (TTS üretim hattı: DB-backed kuyruk, tek-segment yeniden üretme + segment-başı ses dosyaları, content-hash cache, maliyet, RPM/RPD ilerleme) için brainstorming/writing-plans. RPD kotası hâlâ kritik (Bilinen kısıtlar #1) — hacim öncesi faturalamalı Gemini anahtarı veya Chirp adapter kararı gündemde. Ertelenmiş minorlar: generate SSE cancel/abort (C'de core AbortSignal ile), PWA statik varlık auth (D'de).

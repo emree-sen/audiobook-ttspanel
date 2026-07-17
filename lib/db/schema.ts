@@ -21,6 +21,8 @@ export const chapters = sqliteTable('chapters', {
   title: text('title').notNull(),
   rawText: text('raw_text').notNull().default(''),
   narrationStyle: text('narration_style'),
+  voiceMode: text('voice_mode').notNull().default('narrator'), // narrator|multi
+  maxCharacters: integer('max_characters').notNull().default(6),
   status: text('status').notNull().default('draft'), // draft|scripted|generating|done|error
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
@@ -32,6 +34,7 @@ export const scripts = sqliteTable('scripts', {
   version: integer('version').notNull(),
   source: text('source').notNull(), // manual|llm (Dilim A: manual)
   json: text('json').notNull(),     // doğrulanmış VoiceoverScript JSON metni
+  usageJson: text('usage_json'), // LLM üretiminde {"inputTokens":..,"outputTokens":..,"chunks":..}
   createdAt: integer('created_at').notNull(),
 });
 

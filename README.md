@@ -6,7 +6,8 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 
 - ✅ Ses çekirdeği: JSON seslendirme script'i → Gemini TTS → mp3 (CLI)
 - ✅ Web panel (Dilim A): proje/bölüm yönetimi, script import, üretim + dinleme
-- ⬜ LLM annotation (metin → script otomatik), sağlam üretim kuyruğu, PWA oynatıcı
+- ✅ LLM annotation: ham metin + anlatım tarzı + ses modu → otomatik script (Gemini, BYO-key); ek talimatla yeniden üretme; cast ses düzeltme
+- ⬜ Sağlam üretim kuyruğu (tek-segment yeniden üretme, cache, maliyet), PWA oynatıcı
 
 ## Kurulum
 
@@ -26,17 +27,16 @@ npm run dev            # http://localhost:3000
 
 ## Kullanım
 
-1. Panelde proje → bölüm oluştur, ham metnini yapıştır.
-2. Şimdilik: bölüm metnini Claude'a verip JSON seslendirme script'i üret (şema: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md` §6), panele yapıştır. (LLM annotation panele entegre edilecek — Dilim B.)
+1. Panelde proje → bölüm oluştur, ham metnini yapıştır; anlatım tarzını ve ses modunu (tek anlatıcı / çok karakterli) seç.
+2. **"Script üret (LLM)"** → sistem metni segmentlere ayırır, duygu/stil etiketler, karakterlere havuzdan ses atar. Beğenmezsen ek talimat yazıp **"Yeniden üret"**; karakter sesini listeden değiştir.
 3. "Üret" → segment segment TTS + birleştirme → tarayıcıda dinle.
 
-Ücretsiz deneme için `.env`'de `TTS_PROVIDER=mock` (sessiz test sesi üretir, API çağrısı yapmaz).
-
-CLI hâlâ çalışır: `npx tsx src/cli/generate.ts <script.json> --out ./out --provider gemini`
+Ücretsiz deneme: `.env`'de `TTS_PROVIDER=mock` ve `LLM_PROVIDER=mock` (API çağrısı yapmaz). Elle JSON script yapıştırma "gelişmiş" bölümünde durur (şema: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md` §6).
 
 ## Bilinen kısıtlar
 
 - Gemini TTS free tier: **günde 100 istek** (model başına). Uzun bölümler yarıda kalabilir; başarısız segmentler işaretlenir. Faturalamalı (paid tier) anahtarla limit yükselir.
+- LLM annotation varsayılanı `gemini-2.5-flash` (ücretsiz kota, TTS kotasından ayrı); `LLM_MODEL` ile değiştirilebilir.
 - Ses `<audio>` ile tam-dosya servis edilir; ileri sarma kısıtlı olabilir (iyileştirme planlı).
 
 ## Veri
