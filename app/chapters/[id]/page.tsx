@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { VOICE_POOL } from '@/lib/voices-pool';
 import { Icon } from '@/lib/ui/Icon';
 import { EmptyState } from '@/lib/ui/EmptyState';
+import { refreshTree } from '@/lib/ui/refresh';
 
 type Chapter = { id: string; projectId: string; title: string; rawText: string; narrationStyle: string | null; voiceMode: string; maxCharacters: number; status: string };
 type Segment = { id: string; idx: number; speaker: string; style: string | null; text: string; status: string; error: string | null };
@@ -85,7 +86,7 @@ export default function ChapterPage() {
       setAnnState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
     } finally {
       setAnnState((s) => ({ ...s, busy: false }));
-      load();
+      refreshTree(); load();
     }
   }
 
@@ -101,7 +102,7 @@ export default function ChapterPage() {
   async function saveScript() {
     setScriptErr('');
     const res = await fetch(`/api/chapters/${id}/script`, { method: 'PUT', body: scriptJson });
-    if (res.ok) { setScriptJson(''); load(); }
+    if (res.ok) { setScriptJson(''); refreshTree(); load(); }
     else setScriptErr((await res.json()).error ?? 'Script kaydedilemedi');
   }
 
@@ -116,7 +117,7 @@ export default function ChapterPage() {
       setGenState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
     } finally {
       setGenState((s) => ({ ...s, busy: false }));
-      load();
+      refreshTree(); load();
     }
   }
 

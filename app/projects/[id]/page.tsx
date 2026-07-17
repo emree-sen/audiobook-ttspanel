@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Icon } from '@/lib/ui/Icon';
 import { ConfirmButton } from '@/lib/ui/ConfirmButton';
 import { EmptyState } from '@/lib/ui/EmptyState';
+import { refreshTree } from '@/lib/ui/refresh';
 
 type Chapter = { id: string; title: string; position: number; status: string };
 type Detail = { project: { id: string; title: string }; chapters: Chapter[] };
@@ -24,11 +25,11 @@ export default function ProjectPage() {
     e.preventDefault();
     if (!title.trim()) return;
     await fetch(`/api/projects/${id}/chapters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    setTitle(''); load();
+    setTitle(''); refreshTree(); load();
   }
 
   async function remove(chapterId: string) {
-    await fetch(`/api/chapters/${chapterId}`, { method: 'DELETE' }); load();
+    await fetch(`/api/chapters/${chapterId}`, { method: 'DELETE' }); refreshTree(); load();
   }
 
   async function move(idx: number, dir: -1 | 1) {
@@ -39,7 +40,7 @@ export default function ProjectPage() {
       fetch(`/api/chapters/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: b.position }) }),
       fetch(`/api/chapters/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: a.position }) }),
     ]);
-    load();
+    refreshTree(); load();
   }
 
   if (!detail) return <p className="muted">Yükleniyor…</p>;

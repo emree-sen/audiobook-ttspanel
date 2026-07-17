@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Icon } from '@/lib/ui/Icon';
 import { ConfirmButton } from '@/lib/ui/ConfirmButton';
 import { EmptyState } from '@/lib/ui/EmptyState';
+import { refreshTree } from '@/lib/ui/refresh';
 
 type Project = { id: string; title: string; description: string | null; updatedAt: number };
 
@@ -18,18 +19,18 @@ export default function ProjectsPage() {
     e.preventDefault();
     if (!title.trim()) return;
     await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    setTitle(''); load();
+    setTitle(''); refreshTree(); load();
   }
 
   async function remove(id: string) {
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' }); load();
+    await fetch(`/api/projects/${id}`, { method: 'DELETE' }); refreshTree(); load();
   }
 
   async function rename(p: Project) {
     const title = prompt('Yeni proje adı:', p.title);
     if (!title?.trim() || title === p.title) return;
     await fetch(`/api/projects/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.trim() }) });
-    load();
+    refreshTree(); load();
   }
 
   return (
