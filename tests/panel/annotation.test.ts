@@ -128,6 +128,48 @@ describe('annotateChapter (MockLlmAdapter)', () => {
     await annotateChapter(db, chapterId, new MockLlmAdapter(), { onProgress: (d, t) => progress.push([d, t]) });
     expect(progress).toEqual([[1, 1]]);
   });
+
+  test('çok-chunk (multi mod): knownCast bir sonraki parçaya taşınır, usage toplanır, onProgress her parça için çağrılır', async () => {
+    // 2 chunk zorlamak için: her paragraf ~7000 char (target=12000 default'u aşacak şekilde toplam >12000).
+    const baseA = 'Kaan sordu, "Kim var orada?" diye bağırdı. ';
+    const baseB = 'Zindanın taşları soğuktu ve rüzgar uğulduyordu. ';
+    const paraA = baseA.repeat(163); // ~7009 char, tırnaklı diyalog içerir → kisi1 tespit edilir
+    const paraB = baseB.repeat(156); // ~7020 char, düz anlatım → diyalog yok
+    const rawText = `${paraA}\n\n${paraB}`;
+    expect(chunkText(rawText)).toHaveLength(2); // ön koşul: paragraf sınırından 2 parçaya bölünmeli
+
+    const db = createDb(':memory:');
+    const p = createProject(db, { title: 'R' });
+    const c = createChapter(db, p.id, { title: 'B1' });
+    updateChapter(db, c.id, { rawText, narrationStyle: 'gizemli', voiceMode: 'multi' });
+
+    const systems: string[] = [];
+    const users: string[] = [];
+    const inner = new MockLlmAdapter();
+    const recorder: LlmAdapter = {
+      id: 'recorder',
+      annotate(req) {
+        systems.push(req.system);
+        users.push(req.user);
+        return inner.annotate(req);
+      },
+    };
+    const progress: [number, number][] = [];
+    const out = await annotateChapter(db, c.id, recorder, { onProgress: (d, t) => progress.push([d, t]) });
+
+    expect(progress).toEqual([[1, 2], [2, 2]]);
+    expect(out.usage.chunks).toBe(2);
+    const expectedInputTokens = users.reduce((sum, u) => sum + Math.ceil(u.length / 4), 0);
+    expect(out.usage.inputTokens).toBeGreaterThan(0);
+    expect(out.usage.inputTokens).toBe(expectedInputTokens);
+
+    expect(systems[0]).not.toContain('BİLİNEN KARAKTERLER');
+    expect(systems[1]).toContain('BİLİNEN KARAKTERLER');
+    expect(systems[1]).toContain('kisi1');
+
+    const json = JSON.parse(latestScript(db, c.id)!.json);
+    expect(json.cast.filter((cc: any) => cc.character_id === 'kisi1')).toHaveLength(1);
+  });
 });
 
 describe('llmAdapterFromSettings', () => {
