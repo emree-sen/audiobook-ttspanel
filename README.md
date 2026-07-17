@@ -7,7 +7,8 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 - ✅ Ses çekirdeği: JSON seslendirme script'i → Gemini TTS → mp3 (CLI)
 - ✅ Web panel (Dilim A): proje/bölüm yönetimi, script import, üretim + dinleme
 - ✅ LLM annotation: ham metin + anlatım tarzı + ses modu → otomatik script (Gemini, BYO-key); ek talimatla yeniden üretme; cast ses düzeltme
-- ⬜ Sağlam üretim kuyruğu (tek-segment yeniden üretme, cache, maliyet), PWA oynatıcı
+- ✅ Üretim hattı: DB-destekli kuyruk (tarayıcı kapansa da sürer), preflight çağrı hesabı + günlük kota göstergesi, kotaya çarpınca duraklat/devam, content-hash önbelleği (değişmeyen segment tekrar TTS'e gitmez), segment başına dinleme + tek-segment yeniden üretme
+- ⬜ Sağlayıcı ekosistemi (OpenAI-uyumlu endpoint + Piper lokal TTS + ayarlar ekranı), PWA oynatıcı
 
 ## Kurulum
 
@@ -35,7 +36,7 @@ npm run dev            # http://localhost:3000
 
 ## Bilinen kısıtlar
 
-- Gemini TTS free tier: **günde 100 istek** (model başına). Uzun bölümler yarıda kalabilir; başarısız segmentler işaretlenir. Faturalamalı (paid tier) anahtarla limit yükselir.
+- Gemini TTS free tier: **günde 100 istek** (model başına). Panel bunu yönetir: üretim öncesi kaç çağrı gerektiğini gösterir, hak bitince işi duraklatır, ertesi gün "Devam et" ile sürersiniz. Faturalı anahtarda `quota_limit_gemini` ayarını yükseltin.
 - LLM annotation varsayılanı `gemini-2.5-flash` (ücretsiz kota, TTS kotasından ayrı); `LLM_MODEL` ile değiştirilebilir.
 - Ses `<audio>` ile tam-dosya servis edilir; ileri sarma kısıtlı olabilir (iyileştirme planlı).
 
