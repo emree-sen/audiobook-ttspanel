@@ -147,6 +147,16 @@ describe('recover + worker', () => {
     expect(latestJob(db, chapterId)!.status).toBe('done');
   });
 
+  test('senkron biten ensureWorker singleton\'ı zehirlemez (regresyon: c76a0f6)', async () => {
+    const { db, chapterId } = setup();
+    setSetting(db, 'provider', 'mock');
+    await ensureWorker(db); // hiç iş yok — tamamen senkron yol
+    const job = enqueueJob(db, chapterId);
+    await ensureWorker(db); // zehirlenmiş olsaydı hiçbir şey yapmazdı
+    expect(latestJob(db, chapterId)!.status).toBe('done');
+    expect(job.id).toBe(latestJob(db, chapterId)!.id);
+  });
+
   test('ensureWorker duraklamış (pausedReason) işi kendiliğinden sürdürmez', async () => {
     const { db, chapterId } = setup();
     setSetting(db, 'provider', 'mock');
