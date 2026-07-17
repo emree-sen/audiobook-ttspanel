@@ -2,15 +2,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { VOICE_POOL } from '@/lib/voices-pool';
 
-type Chapter = { id: string; projectId: string; title: string; rawText: string; narrationStyle: string | null; status: string };
+type Chapter = { id: string; projectId: string; title: string; rawText: string; narrationStyle: string | null; voiceMode: string; maxCharacters: number; status: string };
 type Segment = { id: string; idx: number; speaker: string; style: string | null; text: string; status: string; error: string | null };
 type Render = { id: string; path: string; durationSec: number | null; createdAt: number };
-type Detail = { chapter: Chapter; script: { id: string; version: number; segmentCount: number } | null; segments: Segment[]; renders: Render[] };
+type CastMember = { character_id: string; display_name: string; voice_id: string; base_style?: string };
+type ScriptInfo = { id: string; version: number; segmentCount: number; source: string; usage: { inputTokens: number; outputTokens: number; chunks: number } | null };
+type Detail = { chapter: Chapter; script: ScriptInfo | null; cast: CastMember[]; segments: Segment[]; renders: Render[] };
 
 // POST + SSE: EventSource sadece GET desteklediği için fetch-stream ile okunur.
-async function streamGenerate(chapterId: string, onEvent: (ev: string, data: any) => void) {
-  const res = await fetch(`/api/chapters/${chapterId}/generate`, { method: 'POST' });
+async function streamSse(url: string, body: unknown, onEvent: (ev: string, data: any) => void) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
   let buf = '';
@@ -33,8 +36,12 @@ export default function ChapterPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [rawText, setRawText] = useState('');
   const [narrationStyle, setNarrationStyle] = useState('');
+  const [voiceMode, setVoiceMode] = useState('narrator');
+  const [maxCharacters, setMaxCharacters] = useState(6);
+  const [instruction, setInstruction] = useState('');
   const [scriptJson, setScriptJson] = useState('');
   const [scriptErr, setScriptErr] = useState('');
+  const [annState, setAnnState] = useState<{ busy: boolean; chunk: number; totalChunks: number; err: string }>({ busy: false, chunk: 0, totalChunks: 0, err: '' });
   const [genState, setGenState] = useState<{ busy: boolean; done: number; total: number; err: string }>({ busy: false, done: 0, total: 0, err: '' });
 
   async function load() {
@@ -44,11 +51,43 @@ export default function ChapterPage() {
     setDetail(d);
     setRawText(d.chapter.rawText);
     setNarrationStyle(d.chapter.narrationStyle ?? '');
+    setVoiceMode(d.chapter.voiceMode);
+    setMaxCharacters(d.chapter.maxCharacters);
   }
   useEffect(() => { load(); }, [id]);
 
   async function saveText() {
-    await fetch(`/api/chapters/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText, narrationStyle }) });
+    await fetch(`/api/chapters/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawText, narrationStyle, voiceMode, maxCharacters }),
+    });
+    load();
+  }
+
+  // LLM annotation: önce metin/mod kaydedilir, sonra SSE ile üretim izlenir.
+  async function annotate(withInstruction: boolean) {
+    setAnnState({ busy: true, chunk: 0, totalChunks: 0, err: '' });
+    try {
+      await saveText();
+      await streamSse(`/api/chapters/${id}/annotate`, withInstruction && instruction.trim() ? { instruction: instruction.trim() } : {}, (ev, data) => {
+        if (ev === 'progress') setAnnState((s) => ({ ...s, chunk: data.chunk, totalChunks: data.totalChunks }));
+        if (ev === 'error') setAnnState((s) => ({ ...s, err: data.message }));
+      });
+      if (withInstruction) setInstruction('');
+    } catch (e) {
+      setAnnState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
+    } finally {
+      setAnnState((s) => ({ ...s, busy: false }));
+      load();
+    }
+  }
+
+  async function changeVoice(characterId: string, voiceId: string) {
+    const res = await fetch(`/api/chapters/${id}/cast-voice`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterId, voiceId }),
+    });
+    if (!res.ok) setScriptErr((await res.json()).error ?? 'Ses değiştirilemedi');
     load();
   }
 
@@ -62,7 +101,7 @@ export default function ChapterPage() {
   async function generate() {
     setGenState({ busy: true, done: 0, total: detail?.script?.segmentCount ?? 0, err: '' });
     try {
-      await streamGenerate(id, (ev, data) => {
+      await streamSse(`/api/chapters/${id}/generate`, {}, (ev, data) => {
         if (ev === 'progress') setGenState((s) => ({ ...s, done: data.done, total: data.total }));
         if (ev === 'error') setGenState((s) => ({ ...s, err: data.message }));
       });
@@ -75,7 +114,9 @@ export default function ChapterPage() {
   }
 
   if (!detail) return <p className="muted">Yükleniyor…</p>;
-  const { chapter, script, segments, renders } = detail;
+  const { chapter, script, cast, segments, renders } = detail;
+  const voiceOptions = (current: string) =>
+    VOICE_POOL.some((v) => v.voiceId === current) ? VOICE_POOL : [{ voiceId: current, gender: 'male' as const, tone: 'mevcut' }, ...VOICE_POOL];
 
   return (
     <>
@@ -83,17 +124,76 @@ export default function ChapterPage() {
       <h1>{chapter.title} <span className={`badge ${chapter.status}`}>{chapter.status}</span></h1>
 
       <div className="card">
-        <h2>Ham metin + anlatım tarzı</h2>
-        <p><textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="Bölümün ham metni (Dilim B'de LLM bunu script'e çevirecek)" /></p>
+        <h2>Ham metin + anlatım</h2>
+        <p><textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="Bölümün ham metni" /></p>
         <p><input value={narrationStyle} onChange={(e) => setNarrationStyle(e.target.value)} placeholder="Anlatım tarzı (ör. sakin, gizemli, üçüncü şahıs)" /></p>
-        <button onClick={saveText}>Kaydet</button>
+        <p className="row">
+          <select value={voiceMode} onChange={(e) => setVoiceMode(e.target.value)} style={{ maxWidth: '14rem' }}>
+            <option value="narrator">Tek anlatıcı</option>
+            <option value="multi">Çok karakterli</option>
+          </select>
+          {voiceMode === 'multi' && (
+            <label className="row muted">maks. karakter:
+              <input type="number" min={1} max={12} value={maxCharacters} onChange={(e) => setMaxCharacters(Number(e.target.value) || 6)} style={{ width: '4.5rem' }} />
+            </label>
+          )}
+        </p>
+        <p className="row">
+          <button className="ghost" onClick={saveText}>Kaydet</button>
+          <button onClick={() => annotate(false)} disabled={annState.busy || !rawText.trim()}>
+            {annState.busy ? 'Üretiliyor…' : 'Script üret (LLM)'}
+          </button>
+          {annState.busy && annState.totalChunks > 0 && <span className="muted">{annState.chunk}/{annState.totalChunks} parça</span>}
+        </p>
+        {annState.busy && annState.totalChunks > 1 && <progress value={annState.chunk} max={annState.totalChunks} />}
+        {annState.err && <p className="err">{annState.err}</p>}
       </div>
 
       <div className="card">
-        <h2>Seslendirme script’i {script && <span className="muted">(v{script.version}, {script.segmentCount} segment)</span>}</h2>
-        <p><textarea value={scriptJson} onChange={(e) => setScriptJson(e.target.value)} placeholder='Claude’un ürettiği JSON script’i buraya yapıştır' /></p>
+        <h2>
+          Seslendirme script’i{' '}
+          {script && (
+            <span className="muted">
+              (v{script.version}, {script.segmentCount} segment, {script.source === 'llm' ? 'LLM' : 'elle'}
+              {script.usage ? `, ${script.usage.inputTokens}+${script.usage.outputTokens} token` : ''})
+            </span>
+          )}
+        </h2>
+
+        {cast.length > 0 && (
+          <table>
+            <thead><tr><th>Karakter</th><th>Ton</th><th>Ses</th></tr></thead>
+            <tbody>
+              {cast.map((c) => (
+                <tr key={c.character_id}>
+                  <td>{c.display_name}</td>
+                  <td className="muted">{c.base_style ?? ''}</td>
+                  <td>
+                    <select value={c.voice_id} onChange={(e) => changeVoice(c.character_id, e.target.value)} style={{ maxWidth: '16rem' }}>
+                      {voiceOptions(c.voice_id).map((v) => (
+                        <option key={v.voiceId} value={v.voiceId}>{v.voiceId.split(':')[1]} — {v.tone}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {script && (
+          <p className="row">
+            <input value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Ek talimat (ör. daha az segment, Kaan daha öfkeli)" />
+            <button onClick={() => annotate(true)} disabled={annState.busy}>Yeniden üret</button>
+          </p>
+        )}
+
+        <details>
+          <summary className="muted">Elle JSON yapıştır (gelişmiş)</summary>
+          <p><textarea value={scriptJson} onChange={(e) => setScriptJson(e.target.value)} placeholder="JSON script’i buraya yapıştır" /></p>
+          <button onClick={saveScript} disabled={!scriptJson.trim()}>Script kaydet</button>
+        </details>
         {scriptErr && <p className="err">{scriptErr}</p>}
-        <button onClick={saveScript} disabled={!scriptJson.trim()}>Script kaydet</button>
       </div>
 
       <div className="card">
