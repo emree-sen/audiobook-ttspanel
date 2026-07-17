@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { JetBrains_Mono, Manrope } from 'next/font/google';
 import { LogoutButton } from '@/lib/ui/LogoutButton';
+import { Sidebar } from '@/lib/ui/Sidebar';
 
 const manrope = Manrope({ subsets: ['latin', 'latin-ext'], variable: '--font-manrope' });
 const jbmono = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], variable: '--font-jbmono' });
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <span className="spacer" />
           <LogoutButton />
         </header>
-        <main className="container">{children}</main>
+        <div className="shell">
+          <Sidebar />
+          <main className="container">{children}</main>
+        </div>
       </body>
     </html>
   );

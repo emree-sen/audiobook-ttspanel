@@ -2,7 +2,8 @@ import type { ReactElement } from 'react';
 
 export type IconName =
   | 'play' | 'trash' | 'pencil' | 'up' | 'down' | 'plus'
-  | 'person' | 'doc' | 'wave' | 'speaker' | 'warn' | 'logout' | 'spinner';
+  | 'person' | 'doc' | 'wave' | 'speaker' | 'warn' | 'logout' | 'spinner'
+  | 'chev' | 'menu' | 'folder';
 
 // Saf inline SVG ikon seti — bağımlılık yok; stroke tabanlı, currentColor.
 const paths: Record<IconName, ReactElement> = {
@@ -19,15 +20,18 @@ const paths: Record<IconName, ReactElement> = {
   warn: <><path d="M8 1.8 15 13.8H1z" /><path d="M8 6v4M8 11.8v.4" /></>,
   logout: <><path d="M6 2.5H3.5v11H6" /><path d="M10 5l3 3-3 3M13 8H7" /></>,
   spinner: <path d="M8 1.5a6.5 6.5 0 1 1-6.5 6.5" />,
+  chev: <path d="M6 3.5 10.5 8 6 12.5" />,
+  menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
+  folder: <path d="M1.8 4.5a1 1 0 0 1 1-1h3.4l1.5 1.6h5.5a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />,
 };
 
-export function Icon({ name, size = 16, label }: { name: IconName; size?: number; label?: string }) {
+export function Icon({ name, size = 16, label, className }: { name: IconName; size?: number; label?: string; className?: string }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 16 16"
       fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
       aria-hidden={label ? undefined : true} aria-label={label} role={label ? 'img' : undefined}
-      className={name === 'spinner' ? 'spin' : undefined}
+      className={[name === 'spinner' ? 'spin' : '', className ?? ''].filter(Boolean).join(' ') || undefined}
     >
       {paths[name]}
     </svg>
