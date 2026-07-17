@@ -4,14 +4,14 @@ import { chapters } from '../db/schema';
 import { newId } from '../id';
 
 export type Chapter = typeof chapters.$inferSelect;
-export type ChapterPatch = { title?: string; rawText?: string; narrationStyle?: string | null; position?: number; status?: string };
+export type ChapterPatch = { title?: string; rawText?: string; narrationStyle?: string | null; position?: number; status?: string; voiceMode?: string; maxCharacters?: number };
 
 export function createChapter(db: Db, projectId: string, input: { title: string }): Chapter {
   const now = Date.now();
   const m = db.select({ m: max(chapters.position) }).from(chapters).where(eq(chapters.projectId, projectId)).get();
   const row: Chapter = {
     id: newId('chp'), projectId, position: (m?.m ?? 0) + 1, title: input.title,
-    rawText: '', narrationStyle: null, status: 'draft', createdAt: now, updatedAt: now,
+    rawText: '', narrationStyle: null, voiceMode: 'narrator', maxCharacters: 6, status: 'draft', createdAt: now, updatedAt: now,
   };
   db.insert(chapters).values(row).run();
   return row;

@@ -4,14 +4,14 @@ import { scripts, segments } from '../db/schema';
 import { newId } from '../id';
 import { updateChapter } from './chapters';
 import { parseScript } from '@/src/core/schema';
-import { resolveVoiceForSpeaker, validateSpeakers } from '@/src/core/voices';
+import { parseVoiceId, resolveVoiceForSpeaker, validateSpeakers } from '@/src/core/voices';
 
 export type ScriptRow = typeof scripts.$inferSelect;
 export type SegmentRow = typeof segments.$inferSelect;
 
-// Elle yapıştırılan JSON script'i doğrular ve versiyonlu olarak kaydeder.
+// Script JSON'unu doğrular ve versiyonlu kaydeder (manual: elle yapıştırma, llm: annotation).
 // Geçersiz girişte fırlatır (SyntaxError | ZodError | Error) — hiçbir satır yazılmaz.
-export function importScript(db: Db, chapterId: string, jsonText: string): { scriptId: string; version: number; segmentCount: number } {
+export function saveScript(db: Db, chapterId: string, jsonText: string, source: 'manual' | 'llm', usageJson?: string): { scriptId: string; version: number; segmentCount: number } {
   const parsed = parseScript(JSON.parse(jsonText));
   validateSpeakers(parsed); // bilinmeyen konuşmacı varsa erken ve anlaşılır hata
 
@@ -21,7 +21,7 @@ export function importScript(db: Db, chapterId: string, jsonText: string): { scr
   const scriptId = newId('scr');
   const now = Date.now();
 
-  db.insert(scripts).values({ id: scriptId, chapterId, version, source: 'manual', json: jsonText, createdAt: now }).run();
+  db.insert(scripts).values({ id: scriptId, chapterId, version, source, json: jsonText, usageJson: usageJson ?? null, createdAt: now }).run();
   db.insert(segments).values(parsed.segments.map((s, i) => ({
     id: newId('seg'), chapterId, scriptId, idx: i,
     speaker: s.speaker, style: s.style ?? null, text: s.text,
@@ -31,6 +31,23 @@ export function importScript(db: Db, chapterId: string, jsonText: string): { scr
   updateChapter(db, chapterId, { status: 'scripted' });
 
   return { scriptId, version, segmentCount: parsed.segments.length };
+}
+
+export function importScript(db: Db, chapterId: string, jsonText: string): { scriptId: string; version: number; segmentCount: number } {
+  return saveScript(db, chapterId, jsonText, 'manual');
+}
+
+// En güncel script'in cast'inde bir karakterin sesini değiştirip yeni versiyon yazar (LLM çağrısı yok).
+export function changeCastVoice(db: Db, chapterId: string, characterId: string, voiceId: string): { scriptId: string; version: number } {
+  const scr = latestScript(db, chapterId);
+  if (!scr) throw new Error('Bölümün script\'i yok');
+  parseVoiceId(voiceId); // format doğrulaması (geçersizse fırlatır)
+  const json = JSON.parse(scr.json) as { cast?: { character_id: string; voice_id: string }[] };
+  const member = json.cast?.find((c) => c.character_id === characterId);
+  if (!member) throw new Error(`Karakter bulunamadı: "${characterId}"`);
+  member.voice_id = voiceId;
+  const saved = saveScript(db, chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);
+  return { scriptId: saved.scriptId, version: saved.version };
 }
 
 export function latestScript(db: Db, chapterId: string): ScriptRow | undefined {
