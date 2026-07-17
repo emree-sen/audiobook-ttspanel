@@ -6,7 +6,7 @@
 
 Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-sesli** seslendiren, üretim hattı panelli + PWA oynatıcılı, kendi VPS'inde barınan bir **sesli-kitap üretim & dinleme sistemi.**
 
-**Kilit iş bölümü:** Ham bölüm metni → **Claude (oturum içinde, elle) yapılandırılmış bir JSON "seslendirme scripti" üretir** (segment + konuşan + duygu/stil + ses) → sistem TTS + birleştirme + oynatma yapar. Otomatik hatta LLM yok; ileride annotator otomatikleşecek (aynı JSON şeması sözleşme).
+**Kilit iş bölümü:** Ham bölüm metni → **panel içinde LLM annotation** (Dilim B: Gemini, provider-agnostic adapter) yapılandırılmış bir JSON "seslendirme scripti" üretir (segment + konuşan + duygu/stil + ses) → sistem TTS + birleştirme + oynatma yapar. Elle JSON yapıştırma fallback olarak durur (aynı JSON şeması sözleşme).
 
 ## Kullanıcı tercihleri (önemli)
 
