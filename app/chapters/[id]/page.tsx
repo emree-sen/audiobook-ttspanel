@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { VOICE_POOL } from '@/lib/voices-pool';
@@ -8,7 +8,7 @@ import { EmptyState } from '@/lib/ui/EmptyState';
 import { refreshTree } from '@/lib/ui/refresh';
 
 type Chapter = { id: string; projectId: string; title: string; rawText: string; narrationStyle: string | null; voiceMode: string; maxCharacters: number; status: string };
-type Segment = { id: string; idx: number; speaker: string; style: string | null; text: string; status: string; error: string | null };
+type Segment = { id: string; idx: number; speaker: string; style: string | null; text: string; status: string; error: string | null; audioPath: string | null };
 type Render = { id: string; path: string; durationSec: number | null; createdAt: number };
 type CastMember = { character_id: string; display_name: string; voice_id: string; base_style?: string };
 type ScriptInfo = { id: string; version: number; segmentCount: number; source: string; usage: { inputTokens: number; outputTokens: number; chunks: number } | null };
@@ -50,7 +50,12 @@ export default function ChapterPage() {
   const [scriptJson, setScriptJson] = useState('');
   const [scriptErr, setScriptErr] = useState('');
   const [annState, setAnnState] = useState<{ busy: boolean; chunk: number; totalChunks: number; err: string }>({ busy: false, chunk: 0, totalChunks: 0, err: '' });
-  const [genState, setGenState] = useState<{ busy: boolean; done: number; total: number; err: string }>({ busy: false, done: 0, total: 0, err: '' });
+  type Preflight = { total: number; cached: number; newCalls: number; quota: { provider: string; used: number; limit: number; remaining: number } | null; fits: boolean };
+  const [pf, setPf] = useState<Preflight | null>(null);
+  const [genState, setGenState] = useState<{ busy: boolean; done: number; total: number; err: string; paused: { reason: string; jobId: string } | null }>({ busy: false, done: 0, total: 0, err: '', paused: null });
+  const [playingSeg, setPlayingSeg] = useState<string | null>(null);
+  const [regenBusy, setRegenBusy] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   async function load() {
     const res = await fetch(`/api/chapters/${id}`);
@@ -61,8 +66,47 @@ export default function ChapterPage() {
     setNarrationStyle(d.chapter.narrationStyle ?? '');
     setVoiceMode(d.chapter.voiceMode);
     setMaxCharacters(d.chapter.maxCharacters);
+    if (d.script) loadPreflight();
+    if (d.chapter.status === 'generating') watchProgress();
   }
   useEffect(() => { load(); }, [id]);
+  useEffect(() => () => esRef.current?.close(), []);
+
+  async function loadPreflight() {
+    const res = await fetch(`/api/chapters/${id}/preflight`);
+    setPf(res.ok ? await res.json() : null);
+  }
+
+  // Üretimi izle: EventSource (GET SSE). Bağlantı kopması işi etkilemez.
+  function watchProgress() {
+    esRef.current?.close();
+    const es = new EventSource(`/api/chapters/${id}/progress`);
+    esRef.current = es;
+    setGenState((s) => ({ ...s, busy: true, err: '', paused: null }));
+    es.addEventListener('progress', (e) => {
+      const d = JSON.parse((e as MessageEvent).data);
+      setGenState((s) => ({ ...s, done: d.done, total: d.total }));
+    });
+    es.addEventListener('done', (e) => {
+      es.close();
+      const d = JSON.parse((e as MessageEvent).data);
+      setGenState({ busy: false, done: d.done, total: d.total, err: d.failedCount ? `${d.failedCount} segment üretilemedi` : '', paused: null });
+      refreshTree(); load(); loadPreflight();
+    });
+    es.addEventListener('paused', (e) => {
+      es.close();
+      const d = JSON.parse((e as MessageEvent).data);
+      setGenState({ busy: false, done: d.done, total: d.total, err: '', paused: { reason: d.reason, jobId: d.jobId } });
+      refreshTree(); load(); loadPreflight();
+    });
+    es.addEventListener('failed', (e) => {
+      es.close();
+      const d = JSON.parse((e as MessageEvent).data);
+      setGenState((s) => ({ ...s, busy: false, err: d.message ?? 'Üretim başarısız', paused: null }));
+      refreshTree(); load(); loadPreflight();
+    });
+    es.onerror = () => { es.close(); setGenState((s) => ({ ...s, busy: false })); load(); };
+  }
 
   async function saveText() {
     await fetch(`/api/chapters/${id}`, {
@@ -86,7 +130,7 @@ export default function ChapterPage() {
       setAnnState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
     } finally {
       setAnnState((s) => ({ ...s, busy: false }));
-      refreshTree(); load();
+      refreshTree(); load(); loadPreflight();
     }
   }
 
@@ -96,29 +140,39 @@ export default function ChapterPage() {
       body: JSON.stringify({ characterId, voiceId }),
     });
     if (!res.ok) setScriptErr((await res.json()).error ?? 'Ses değiştirilemedi');
-    load();
+    load(); loadPreflight();
   }
 
   async function saveScript() {
     setScriptErr('');
     const res = await fetch(`/api/chapters/${id}/script`, { method: 'PUT', body: scriptJson });
-    if (res.ok) { setScriptJson(''); refreshTree(); load(); }
+    if (res.ok) { setScriptJson(''); refreshTree(); load(); loadPreflight(); }
     else setScriptErr((await res.json()).error ?? 'Script kaydedilemedi');
   }
 
-  async function generate() {
-    setGenState({ busy: true, done: 0, total: detail?.script?.segmentCount ?? 0, err: '' });
+  async function generate(limitCalls?: number) {
+    setGenState({ busy: true, done: 0, total: pf?.total ?? 0, err: '', paused: null });
+    const res = await fetch(`/api/chapters/${id}/generate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(limitCalls ? { limitCalls } : {}),
+    });
+    if (!res.ok) { const err = (await res.json()).error ?? 'Üretim başlatılamadı'; setGenState((s) => ({ ...s, busy: false, err })); return; }
+    watchProgress();
+  }
+
+  async function resume(jobId: string) {
+    const res = await fetch(`/api/jobs/${jobId}/resume`, { method: 'POST' });
+    if (res.ok) watchProgress();
+    else setGenState((s) => ({ ...s, err: 'Devam ettirilemedi' }));
+  }
+
+  async function regenerate(segmentId: string) {
+    setRegenBusy(segmentId);
     try {
-      await streamSse(`/api/chapters/${id}/generate`, {}, (ev, data) => {
-        if (ev === 'progress') setGenState((s) => ({ ...s, done: data.done, total: data.total }));
-        if (ev === 'error') setGenState((s) => ({ ...s, err: data.message }));
-      });
-    } catch (e) {
-      setGenState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
-    } finally {
-      setGenState((s) => ({ ...s, busy: false }));
-      refreshTree(); load();
-    }
+      const res = await fetch(`/api/segments/${segmentId}/regenerate`, { method: 'POST' });
+      if (!res.ok) { const err = (await res.json()).error ?? 'Segment yeniden üretilemedi'; setGenState((s) => ({ ...s, err })); }
+      refreshTree(); load(); loadPreflight();
+    } finally { setRegenBusy(null); }
   }
 
   if (!detail) return <p className="muted">Yükleniyor…</p>;
@@ -217,14 +271,39 @@ export default function ChapterPage() {
 
       <div className="card">
         <h2><span className="stage">03</span> Üretim {genState.busy && <Icon name="spinner" />}</h2>
+        {pf && (
+          <p className="muted">
+            {pf.total} segment · {pf.cached} önbellekte · <strong>{pf.newCalls} yeni çağrı</strong>
+            {pf.quota && <> · {pf.quota.provider} bugün {pf.quota.used}/{pf.quota.limit}</>}
+          </p>
+        )}
         <p className="row">
-          <button onClick={generate} disabled={!script || genState.busy}>
-            <Icon name="play" /> {genState.busy ? 'Üretiliyor…' : 'Üret'}
-          </button>
+          {(!pf || pf.fits) && (
+            <button onClick={() => generate()} disabled={!script || genState.busy}>
+              <Icon name="play" /> {genState.busy ? 'Üretiliyor…' : 'Üret'}
+            </button>
+          )}
+          {pf && !pf.fits && pf.quota && (
+            <>
+              <button onClick={() => generate(pf.quota!.remaining)} disabled={genState.busy || pf.quota.remaining < 1}>
+                <Icon name="play" /> İlk {pf.quota.remaining}’i üret
+              </button>
+              <button className="ghost" onClick={() => generate()} disabled={genState.busy}>Yine de hepsini dene</button>
+            </>
+          )}
           {genState.busy && <Eq />}
           {genState.busy && <span className="muted">{genState.done}/{genState.total} segment</span>}
         </p>
-        {genState.total > 0 && <progress value={genState.done} max={genState.total} />}
+        {genState.total > 0 && (genState.busy || genState.paused) && <progress value={genState.done} max={genState.total} />}
+        {genState.paused && (
+          <p className="row">
+            <span className="badge generating">duraklatıldı</span>
+            <span className="muted">
+              {genState.paused.reason === 'quota' ? 'Günlük kota doldu' : 'Çağrı tavanına ulaşıldı'} — {genState.done}/{genState.total} üretildi, kalanlar kuyrukta.
+            </span>
+            <button className="ghost" onClick={() => resume(genState.paused!.jobId)}>Devam et</button>
+          </p>
+        )}
         {genState.err && <p className="err">{genState.err}</p>}
         {renders.map((r) => (
           <p key={r.id} className="player">
@@ -246,7 +325,19 @@ export default function ChapterPage() {
                   <td>{s.speaker}</td>
                   <td className="muted">{s.style ?? ''}</td>
                   <td className="mono">{s.text.length > 80 ? s.text.slice(0, 80) + '…' : s.text}</td>
-                  <td><span className={`badge ${s.status}`}>{s.status}</span>{s.error && <div className="err">{s.error}</div>}</td>
+                  <td>
+                    <span className="row" style={{ gap: '0.3rem', flexWrap: 'nowrap' }}>
+                      <span className={`badge ${s.status}`}>{s.status}</span>
+                      {s.audioPath && (
+                        <button className="icon" onClick={() => setPlayingSeg(playingSeg === s.id ? null : s.id)} aria-label="Segmenti dinle" title="Segmenti dinle"><Icon name="play" size={13} /></button>
+                      )}
+                      <button className="icon" onClick={() => regenerate(s.id)} disabled={genState.busy || annState.busy || regenBusy !== null} aria-label="Yeniden üret (1 çağrı)" title="Yeniden üret (1 çağrı)">
+                        {regenBusy === s.id ? <Icon name="spinner" size={13} /> : <Icon name="wave" size={13} />}
+                      </button>
+                    </span>
+                    {s.error && <div className="err">{s.error}</div>}
+                    {playingSeg === s.id && s.audioPath && <div><audio controls autoPlay src={`/api/audio/${s.audioPath}`} style={{ height: 28, maxWidth: '14rem' }} /></div>}
+                  </td>
                 </tr>
               ))}
             </tbody>
