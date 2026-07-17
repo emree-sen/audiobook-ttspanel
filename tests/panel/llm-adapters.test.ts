@@ -29,7 +29,7 @@ describe('MockLlmAdapter', () => {
   });
 
   test('multi modu kıvrık tırnaklar: kıvrık tırnaklı cümle kisi1 diyaloğu', async () => {
-    const textWithCurlyQuotes = 'Kapı açıldı. "Kim var orada?" diye bağırdı.';
+    const textWithCurlyQuotes = 'Kapı açıldı. “Kim var orada?” diye bağırdı.';
     const r = await new MockLlmAdapter().annotate({ system: buildSystemPrompt({ voiceMode: 'multi', maxCharacters: 6 }), user: textWithCurlyQuotes });
     const chunk = llmChunkSchema.parse(r.json);
     expect(chunk.segments.some((s) => s.speaker === 'kisi1' && s.type === 'dialogue')).toBe(true);
