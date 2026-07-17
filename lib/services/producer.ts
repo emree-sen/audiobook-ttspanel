@@ -168,3 +168,30 @@ export function ensureWorker(db: Db): Promise<void> {
   })();
   return workerPromise;
 }
+
+// Tek segmenti yeniden üretir (cache'i üzerine yazar) ve bölümü yeniden birleştirir.
+export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsAdapter): Promise<{ renderId: string; renderPath: string }> {
+  const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
+  if (!row) throw new Error('Segment bulunamadı');
+  const active = db.select().from(jobs)
+    .where(and(eq(jobs.chapterId, row.chapterId), inArray(jobs.status, ['queued', 'running']))).get();
+  if (active) throw new Error('Bölümde aktif bir üretim işi var — önce bitmesini/duraklamasını iptal edin');
+  const { name: provider, model } = activeProvider(db);
+  const rem = remainingToday(db, provider);
+  if (rem != null && rem <= 0) throw new Error('Bugünkü kota doldu — yarın tekrar deneyin');
+  const { script, plan } = planChapter(db, row.chapterId, row.scriptId);
+  const item = plan[row.idx];
+  try {
+    const res = await adapter.synthesize({
+      text: item.text, voice: parseVoiceId(item.voiceId), language: script.language,
+      style: item.style, tags: item.tags, pronunciations: script.pronunciations,
+    });
+    recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: res.cost.usd ?? 0 });
+    await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
+  } catch (e) {
+    recordCall(db, { provider, model, segmentId: row.id, ok: false });
+    throw new Error(`Segment üretilemedi: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const st = await stitchChapter(db, row.chapterId, row.scriptId);
+  return { renderId: st.renderId, renderPath: st.renderPath };
+}
