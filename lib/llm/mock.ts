@@ -9,7 +9,7 @@ export class MockLlmAdapter implements LlmAdapter {
     const sentences = req.user.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
     let hasDialogue = false;
     const segments = sentences.map((text) => {
-      const dialogue = multi && /["""«]/.test(text);
+      const dialogue = multi && /["“”«]/.test(text);
       if (dialogue) hasDialogue = true;
       return { speaker: dialogue ? 'kisi1' : 'narrator', type: dialogue ? 'dialogue' : 'narration', text };
     });

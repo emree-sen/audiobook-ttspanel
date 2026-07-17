@@ -27,6 +27,14 @@ describe('MockLlmAdapter', () => {
     const req = { system: buildSystemPrompt({ voiceMode: 'multi', maxCharacters: 6 }), user: TEXT };
     expect(await m.annotate(req)).toEqual(await m.annotate(req));
   });
+
+  test('multi modu kıvrık tırnaklar: kıvrık tırnaklı cümle kisi1 diyaloğu', async () => {
+    const textWithCurlyQuotes = 'Kapı açıldı. "Kim var orada?" diye bağırdı.';
+    const r = await new MockLlmAdapter().annotate({ system: buildSystemPrompt({ voiceMode: 'multi', maxCharacters: 6 }), user: textWithCurlyQuotes });
+    const chunk = llmChunkSchema.parse(r.json);
+    expect(chunk.segments.some((s) => s.speaker === 'kisi1' && s.type === 'dialogue')).toBe(true);
+    expect(chunk.cast.map((c) => c.character_id).sort()).toEqual(['kisi1', 'narrator']);
+  });
 });
 
 describe('GeminiLlmAdapter (ağ yok, kurulum)', () => {
