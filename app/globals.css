@@ -47,7 +47,7 @@ h1 .badge { vertical-align: middle; margin-left: 0.5rem; }
 .crumbs { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.9rem; min-width: 0; }
 .crumbs a:hover { color: var(--text); }
 .crumbs .sep { opacity: 0.4; }
-.crumbs .here { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumbs .here { min-width: 0; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .container { max-width: 62rem; margin: 0 auto; padding: 1.4rem 1.2rem 3rem; animation: fadein 200ms ease-out; }
 
@@ -167,7 +167,7 @@ progress::-webkit-progress-value { background: var(--accent); transition: width 
 progress::-moz-progress-bar { background: var(--accent); }
 
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
-.eq span { width: 3px; border-radius: 1px; background: var(--accent); animation: eq 900ms ease-in-out infinite; }
+.eq span { height: 8px; width: 3px; border-radius: 1px; background: var(--accent); animation: eq 900ms ease-in-out infinite; }
 .eq span:nth-child(2) { animation-delay: 150ms; }
 .eq span:nth-child(3) { animation-delay: 300ms; }
 .eq span:nth-child(4) { animation-delay: 450ms; }
@@ -210,8 +210,7 @@ summary:hover { color: var(--text); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 640px) {
-  .crumbs a:not(:last-of-type) { display: none; }
-  .crumbs .sep:first-of-type { display: none; }
+  .crumbs a:not(:last-of-type), .crumbs a:not(:last-of-type) + .sep { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
