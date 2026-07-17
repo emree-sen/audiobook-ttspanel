@@ -28,6 +28,9 @@ Panelin 4 sayfasını (login, projeler, bölümler, çalışma alanı) **modern,
 
 ## 3. App shell (`app/layout.tsx`)
 - Üst bar: **sol** marka — küçük dalga-formu SVG logosu + "webnovel-tts" (ana sayfa linki); **orta-sol** breadcrumb (Projeler › {proje} › {bölüm}); **sağ** çıkış düğmesi.
+
+### 3.1 Sol panel — klasör ağacı (revizyon, 2026-07-17 görsel onay turu)
+Kullanıcı geri bildirimiyle eklendi: üst barın altında **kalıcı sol panel** (240px) proje klasörleri (▸ aç/kapa) → bölüm satırları (pozisyon + ad + durum noktası). Aktif bölüm vurgulu; aktif proje otomatik açık. Panel **navigasyon odaklı** — yönetim eylemleri sayfalarda kalır; her klasörün altında "Yönet" bağlantısı (bölüm listesi sayfası) + en altta "Yeni proje" (ana sayfa). Veri: **yeni ek endpoint `GET /api/tree`** → `[{ project, chapters[] }]` (mevcut listProjects+listChapters; Dilim D kütüphanesi de kullanacak — §6'daki "API değişmez" kısıtına tek bilinçli istisna). Tazeleme: rota değişiminde + sayfaların mutasyon sonrası yaydığı `wnt:refresh` window olayında. **<900px:** panel gizli; sağ-alt yüzen amber düğme ile drawer (soldan kayar, scrim'li). Login sayfasında panel yok.
 - Breadcrumb: sayfalar mevcut GET yanıtlarındaki adlarla kendi kırıntılarını basar (yeni API yok). Layout server component kalır; breadcrumb sayfa içinde render edilir (`.crumbs` sınıfı) — layout'a global state taşınmaz.
 - Çıkış: `POST /api/auth/logout` çağıran küçük client bileşeni; auth kapalıyken (PANEL_PASSWORD boş) gizlenmesi ŞART DEĞİL (her zaman görünebilir; logout auth'suz da zararsız).
 - Mobil (<640px): breadcrumb son 2 seviyeye kısalır, bar tek satır kalır.
