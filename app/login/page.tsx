@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon } from '@/lib/ui/Icon';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
@@ -15,11 +16,14 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={submit} className="card" style={{ maxWidth: '22rem', margin: '4rem auto' }}>
-      <h1>Giriş</h1>
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Panel şifresi" autoFocus />
-      {err && <p className="err">{err}</p>}
-      <p><button type="submit">Giriş yap</button></p>
-    </form>
+    <div className="login-wrap">
+      <form onSubmit={submit} className="card login">
+        <div className="brandmark"><Icon name="wave" size={32} label="webnovel-tts" /></div>
+        <h1>Giriş</h1>
+        <p><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Panel şifresi" autoFocus /></p>
+        {err && <p className="err">{err}</p>}
+        <p><button type="submit" style={{ width: '100%' }}>Giriş yap</button></p>
+      </form>
+    </div>
   );
 }

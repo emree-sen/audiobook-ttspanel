@@ -1041,3 +1041,334 @@ git commit -m "docs: UI redesign durumu CLAUDE.md'ye işlendi"
 | Build | `npm run build` | Hatasız (ilk build font indirir) |
 | Headless smoke | Task 7 Step 1 | Sayfalar render + ana akış çalışır |
 | Görsel kabul | dev server + tarayıcı | **Kullanıcı onayı — merge öncesi zorunlu gate** |
+
+---
+
+## Ek Görevler — Sol panel klasör ağacı (spec §3.1 revizyonu)
+
+> Görsel onay turunda kullanıcı istedi; aynı dalda devam. Ek kısıt: `GET /api/tree` bu revizyonun BİLİNÇLİ tek API eklemesidir (davranış değişikliği değil, salt-okur birleşim).
+
+### Task 8: GET /api/tree endpoint'i
+
+**Files:**
+- Create: `app/api/tree/route.ts`
+- Test: `tests/panel/api-tree.test.ts`
+
+**Interfaces:**
+- Consumes: `listProjects`, `listChapters` (mevcut servisler), `getDb/setDbForTests`.
+- Produces: `GET /api/tree` → `[{ project: Project, chapters: Chapter[] }]` (projeler createdAt sıralı, bölümler position sıralı).
+
+- [ ] **Step 1: Failing test yaz**
+
+`tests/panel/api-tree.test.ts`:
+
+```ts
+import { beforeEach, describe, expect, test } from 'vitest';
+import { createDb, setDbForTests, type Db } from '@/lib/db/client';
+import { createProject } from '@/lib/services/projects';
+import { createChapter } from '@/lib/services/chapters';
+import * as treeRoute from '@/app/api/tree/route';
+
+let db: Db;
+beforeEach(() => { db = createDb(':memory:'); setDbForTests(db); });
+
+describe('GET /api/tree', () => {
+  test('boş durumda boş dizi', async () => {
+    expect(await (await treeRoute.GET()).json()).toEqual([]);
+  });
+
+  test('projeler + bölümleri sıralı döner', async () => {
+    const p1 = createProject(db, { title: 'Roman' });
+    const p2 = createProject(db, { title: 'Deneme' });
+    createChapter(db, p1.id, { title: 'B1' });
+    createChapter(db, p1.id, { title: 'B2' });
+    const tree = await (await treeRoute.GET()).json();
+    expect(tree).toHaveLength(2);
+    expect(tree[0].project.title).toBe('Roman');
+    expect(tree[0].chapters.map((c: any) => c.title)).toEqual(['B1', 'B2']);
+    expect(tree[1].chapters).toEqual([]);
+    expect(tree[0].chapters[0]).toMatchObject({ position: 1, status: 'draft' });
+  });
+});
+```
+
+- [ ] **Step 2: Fail doğrula** — `npx vitest run tests/panel/api-tree.test.ts` → FAIL (modül yok).
+
+- [ ] **Step 3: Rotayı yaz**
+
+`app/api/tree/route.ts`:
+
+```ts
+import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/db/client';
+import { listProjects } from '@/lib/services/projects';
+import { listChapters } from '@/lib/services/chapters';
+
+// Sol panel + (ileride) kütüphane için tek sorguda proje→bölüm ağacı.
+export async function GET() {
+  const db = getDb();
+  return NextResponse.json(listProjects(db).map((project) => ({ project, chapters: listChapters(db, project.id) })));
+}
+```
+
+- [ ] **Step 4: PASS + tüm testler** — `npx vitest run tests/panel/api-tree.test.ts` → PASS (2); `npm run build && npm test` → temiz + 101 PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/api/tree/route.ts tests/panel/api-tree.test.ts
+git commit -m "feat(panel): GET /api/tree — sol panel için proje→bölüm ağacı"
+```
+
+---
+
+### Task 9: Sidebar bileşeni + shell entegrasyonu
+
+**Files:**
+- Modify: `lib/ui/Icon.tsx` (3 yeni ikon + className prop)
+- Create: `lib/ui/Sidebar.tsx`
+- Modify: `app/layout.tsx` (shell iki kolon)
+- Modify: `app/globals.css` (sonuna panel CSS bloğu)
+
+**Interfaces:**
+- Consumes: `GET /api/tree` (Task 8), Icon, mevcut token'lar.
+- Produces: `Sidebar` (client; `/login`'de null döner; `wnt:refresh` olayını dinler); `IconName`'e `chev | menu | folder` eklenir; `Icon` `className?` prop'u kazanır.
+
+- [ ] **Step 1: Icon.tsx güncelle**
+
+`IconName` union'ına ekle: `| 'chev' | 'menu' | 'folder'`. `paths`'e ekle:
+
+```tsx
+  chev: <path d="M6 3.5 10.5 8 6 12.5" />,
+  menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
+  folder: <path d="M1.8 4.5a1 1 0 0 1 1-1h3.4l1.5 1.6h5.5a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />,
+```
+
+`Icon` imzasını genişlet — `className?: string` ekle:
+
+```tsx
+export function Icon({ name, size = 16, label, className }: { name: IconName; size?: number; label?: string; className?: string }) {
+```
+
+svg'nin `className` satırı şu olsun:
+
+```tsx
+      className={[name === 'spinner' ? 'spin' : '', className ?? ''].filter(Boolean).join(' ') || undefined}
+```
+
+- [ ] **Step 2: Sidebar.tsx oluştur**
+
+`lib/ui/Sidebar.tsx`:
+
+```tsx
+'use client';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Icon } from './Icon';
+
+type Chapter = { id: string; title: string; position: number; status: string };
+type Node = { project: { id: string; title: string }; chapters: Chapter[] };
+
+// Sol panel: proje klasörleri → bölüm satırları. Navigasyon odaklı; yönetim sayfalarda.
+export function Sidebar() {
+  const pathname = usePathname();
+  const [tree, setTree] = useState<Node[] | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [drawer, setDrawer] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch('/api/tree');
+    if (res.ok) setTree(await res.json());
+  }, []);
+
+  useEffect(() => { load(); }, [load, pathname]);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener('wnt:refresh', h);
+    return () => window.removeEventListener('wnt:refresh', h);
+  }, [load]);
+  useEffect(() => { setDrawer(false); }, [pathname]); // rota değişince drawer kapanır
+
+  const chapterId = /^\/chapters\/([^/]+)/.exec(pathname)?.[1];
+
+  // Aktif bölümün/projenin klasörünü otomatik aç
+  useEffect(() => {
+    if (!tree) return;
+    const projFromUrl = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
+    const active = chapterId ? tree.find((n) => n.chapters.some((c) => c.id === chapterId))?.project.id : projFromUrl;
+    if (active) setOpen((s) => (s.has(active) ? s : new Set(s).add(active)));
+  }, [tree, pathname, chapterId]);
+
+  if (pathname === '/login') return null;
+
+  function toggle(id: string) {
+    setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  return (
+    <>
+      <button className="side-toggle" onClick={() => setDrawer((d) => !d)} aria-label="Kütüphane menüsü" title="Kütüphane">
+        <Icon name="menu" />
+      </button>
+      {drawer && <div className="side-scrim" onClick={() => setDrawer(false)} />}
+      <div className={drawer ? 'side-wrap open' : 'side-wrap'}>
+        <nav className="side" aria-label="Kütüphane">
+          {tree === null && <p className="muted">Yükleniyor…</p>}
+          {tree?.map(({ project, chapters }) => (
+            <div key={project.id} className="side-proj">
+              <button className="side-head" onClick={() => toggle(project.id)} aria-expanded={open.has(project.id)}>
+                <Icon name="chev" size={12} className="chev" />
+                <Icon name="folder" size={14} />
+                <span className="t">{project.title}</span>
+                <span className="muted">{chapters.length}</span>
+              </button>
+              {open.has(project.id) && (
+                <div className="side-list">
+                  {chapters.map((c) => (
+                    <Link key={c.id} href={`/chapters/${c.id}`} className={c.id === chapterId ? 'side-item on' : 'side-item'}>
+                      <span className="pos">{c.position}</span>
+                      <span className="t">{c.title}</span>
+                      <span className={`dot ${c.status}`} title={c.status} />
+                    </Link>
+                  ))}
+                  <Link href={`/projects/${project.id}`} className="side-item manage"><Icon name="pencil" size={12} /> Yönet</Link>
+                </div>
+              )}
+            </div>
+          ))}
+          {tree !== null && <Link href="/" className="side-item manage"><Icon name="plus" size={12} /> Yeni proje</Link>}
+        </nav>
+      </div>
+    </>
+  );
+}
+```
+
+- [ ] **Step 3: layout.tsx shell'i iki kolona çevir**
+
+`app/layout.tsx`'te import ekle: `import { Sidebar } from '@/lib/ui/Sidebar';` ve `<body>` içeriğini şu yapıya getir (topbar içeriği AYNEN kalır):
+
+```tsx
+      <body>
+        <header className="topbar">
+          {/* ...mevcut brand + spacer + LogoutButton aynen... */}
+        </header>
+        <div className="shell">
+          <Sidebar />
+          <main className="container">{children}</main>
+        </div>
+      </body>
+```
+
+- [ ] **Step 4: globals.css sonuna panel bloğu ekle**
+
+```css
+/* ── Sol panel (klasör ağacı) ── */
+.topbar { height: 3.4rem; }
+.shell { display: flex; align-items: flex-start; }
+.shell .container { flex: 1; min-width: 0; }
+.side-wrap {
+  width: 240px; flex-shrink: 0;
+  position: sticky; top: 3.4rem; height: calc(100dvh - 3.4rem);
+  overflow-y: auto; padding: 0.8rem 0.6rem;
+  background: var(--surface); border-right: 1px solid var(--border);
+}
+.side-proj { margin-bottom: 0.2rem; }
+.side-head {
+  display: flex; align-items: center; gap: 0.45rem; width: 100%;
+  background: transparent; color: var(--text);
+  font-weight: 700; font-size: 0.86rem; text-align: left;
+  padding: 0.4rem 0.5rem; border-radius: var(--radius-sm);
+}
+.side-head:hover:not(:disabled) { background: var(--surface-2); }
+.side-head .chev { color: var(--muted); transition: transform 150ms ease-out; flex-shrink: 0; }
+.side-head[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.side-head .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-head .muted { font-size: 0.72rem; }
+.side-list { display: flex; flex-direction: column; gap: 1px; margin: 0.1rem 0 0.4rem 1.05rem; border-left: 1px solid var(--border); padding-left: 0.5rem; }
+.side-item { display: flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--muted); }
+.side-item:hover { background: var(--surface-2); color: var(--text); }
+.side-item.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-weight: 600; }
+.side-item .pos { font-family: var(--font-mono); font-size: 0.72rem; flex-shrink: 0; }
+.side-item .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-item.manage { font-size: 0.78rem; }
+.dot { width: 7px; height: 7px; border-radius: 999px; background: var(--muted); flex-shrink: 0; }
+.dot.scripted { background: var(--info); }
+.dot.done { background: var(--ok); }
+.dot.error { background: var(--err); }
+.dot.generating { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.dot.draft { opacity: 0.5; }
+.side-scrim { display: none; }
+.side-toggle { display: none; }
+
+@media (max-width: 900px) {
+  .side-wrap {
+    position: fixed; left: 0; top: 3.4rem; bottom: 0; height: auto;
+    width: min(280px, 80vw); z-index: 20;
+    transform: translateX(-100%); transition: transform 200ms ease-out;
+    box-shadow: var(--shadow);
+  }
+  .side-wrap.open { transform: none; }
+  .side-scrim { display: block; position: fixed; inset: 0; z-index: 15; background: rgb(0 0 0 / 0.5); }
+  .side-toggle {
+    display: inline-flex; position: fixed; right: 1rem; bottom: 1rem; z-index: 25;
+    background: var(--accent); color: var(--accent-fg);
+    border-radius: 999px; padding: 0.85rem; box-shadow: var(--shadow);
+  }
+}
+```
+
+- [ ] **Step 5: Doğrula + commit** — `npm run build && npm test` → temiz + 101 PASS.
+
+```bash
+git add lib/ui/Icon.tsx lib/ui/Sidebar.tsx app/layout.tsx app/globals.css
+git commit -m "feat(ui): sol panel — proje klasör ağacı + mobil drawer"
+```
+
+---
+
+### Task 10: Mutasyon sonrası panel tazeleme + smoke
+
+**Files:**
+- Create: `lib/ui/refresh.ts`
+- Modify: `app/page.tsx`, `app/projects/[id]/page.tsx`, `app/chapters/[id]/page.tsx` (yalnız `refreshTree()` çağrıları eklenir — BAŞKA HİÇBİR ŞEY DEĞİŞMEZ)
+
+**Interfaces:**
+- Consumes: `wnt:refresh` dinleyicisi (Task 9).
+- Produces: `refreshTree(): void`.
+
+- [ ] **Step 1: refresh.ts**
+
+`lib/ui/refresh.ts`:
+
+```ts
+// Sol panelin ağacını tazeler (Sidebar 'wnt:refresh' olayını dinler).
+export function refreshTree(): void {
+  window.dispatchEvent(new Event('wnt:refresh'));
+}
+```
+
+- [ ] **Step 2: Sayfalara çağrıları ekle**
+
+Her üç sayfaya import: `import { refreshTree } from '@/lib/ui/refresh';`
+
+- `app/page.tsx`: `create`, `remove`, `rename` fonksiyonlarında son `load();` çağrısından ÖNCE `refreshTree();` satırı.
+- `app/projects/[id]/page.tsx`: `create`, `remove`, `move` içinde aynı şekilde.
+- `app/chapters/[id]/page.tsx`: `annotate` ve `generate` fonksiyonlarının `finally` bloğunda `load();`'dan önce `refreshTree();`; `saveScript` başarı dalında `setScriptJson('');` ile `load();` arasına `refreshTree();` (durum rozetleri değişir).
+
+- [ ] **Step 3: Headless smoke**
+
+Mock LLM+TTS, port 3120, throwaway DATA_DIR (Task 7 desenindeki süreç yönetimiyle — netstat PID + taskkill):
+1. `GET /api/tree` → `[]` (200).
+2. Proje + 2 bölüm oluştur → `GET /api/tree` → 1 proje, 2 bölüm sıralı.
+3. `GET /` → HTML `Projeler` içerir (sayfa hâlâ çalışıyor).
+4. annotate + generate akışı (kısa) → `GET /api/tree`'de bölüm status `done`.
+5. Temizlik.
+
+- [ ] **Step 4: Doğrula + commit** — `npm run build && npm test` → temiz + 101 PASS.
+
+```bash
+git add lib/ui/refresh.ts app/page.tsx "app/projects/[id]/page.tsx" "app/chapters/[id]/page.tsx"
+git commit -m "feat(ui): mutasyon sonrası sol panel tazeleme + smoke"
+```

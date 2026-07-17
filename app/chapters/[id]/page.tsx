@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { VOICE_POOL } from '@/lib/voices-pool';
+import { Icon } from '@/lib/ui/Icon';
+import { EmptyState } from '@/lib/ui/EmptyState';
+import { refreshTree } from '@/lib/ui/refresh';
 
 type Chapter = { id: string; projectId: string; title: string; rawText: string; narrationStyle: string | null; voiceMode: string; maxCharacters: number; status: string };
 type Segment = { id: string; idx: number; speaker: string; style: string | null; text: string; status: string; error: string | null };
@@ -29,6 +32,11 @@ async function streamSse(url: string, body: unknown, onEvent: (ev: string, data:
       onEvent(ev, data ? JSON.parse(data) : null);
     }
   }
+}
+
+// Üretim/annotation sürerken oynayan eşitleyici (imza motifi).
+function Eq() {
+  return <span className="eq" aria-hidden="true"><span /><span /><span /><span /><span /></span>;
 }
 
 export default function ChapterPage() {
@@ -78,7 +86,7 @@ export default function ChapterPage() {
       setAnnState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
     } finally {
       setAnnState((s) => ({ ...s, busy: false }));
-      load();
+      refreshTree(); load();
     }
   }
 
@@ -94,7 +102,7 @@ export default function ChapterPage() {
   async function saveScript() {
     setScriptErr('');
     const res = await fetch(`/api/chapters/${id}/script`, { method: 'PUT', body: scriptJson });
-    if (res.ok) { setScriptJson(''); load(); }
+    if (res.ok) { setScriptJson(''); refreshTree(); load(); }
     else setScriptErr((await res.json()).error ?? 'Script kaydedilemedi');
   }
 
@@ -109,7 +117,7 @@ export default function ChapterPage() {
       setGenState((s) => ({ ...s, err: e instanceof Error ? e.message : 'Bağlantı hatası' }));
     } finally {
       setGenState((s) => ({ ...s, busy: false }));
-      load();
+      refreshTree(); load();
     }
   }
 
@@ -120,20 +128,26 @@ export default function ChapterPage() {
 
   return (
     <>
-      <p><Link href={`/projects/${chapter.projectId}`}>← Bölümler</Link></p>
+      <div className="crumbs">
+        <Link href="/">Projeler</Link>
+        <span className="sep">›</span>
+        <Link href={`/projects/${chapter.projectId}`}>Bölümler</Link>
+        <span className="sep">›</span>
+        <span className="here">{chapter.title}</span>
+      </div>
       <h1>{chapter.title} <span className={`badge ${chapter.status}`}>{chapter.status}</span></h1>
 
       <div className="card">
-        <h2>Ham metin + anlatım</h2>
+        <h2><span className="stage">01</span> Metin &amp; anlatım {annState.busy && <Icon name="spinner" />}</h2>
         <p><textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="Bölümün ham metni" /></p>
         <p><input value={narrationStyle} onChange={(e) => setNarrationStyle(e.target.value)} placeholder="Anlatım tarzı (ör. sakin, gizemli, üçüncü şahıs)" /></p>
         <p className="row">
-          <select value={voiceMode} onChange={(e) => setVoiceMode(e.target.value)} style={{ maxWidth: '14rem' }}>
-            <option value="narrator">Tek anlatıcı</option>
-            <option value="multi">Çok karakterli</option>
-          </select>
+          <span className="seg" role="group" aria-label="Ses modu">
+            <button type="button" className={voiceMode === 'narrator' ? 'on' : ''} onClick={() => setVoiceMode('narrator')}>Tek anlatıcı</button>
+            <button type="button" className={voiceMode === 'multi' ? 'on' : ''} onClick={() => setVoiceMode('multi')}>Çok karakterli</button>
+          </span>
           {voiceMode === 'multi' && (
-            <label className="row muted">maks. karakter:
+            <label className="row">maks. karakter:
               <input type="number" min={1} max={12} value={maxCharacters} onChange={(e) => setMaxCharacters(Number(e.target.value) || 6)} style={{ width: '4.5rem' }} />
             </label>
           )}
@@ -141,8 +155,9 @@ export default function ChapterPage() {
         <p className="row">
           <button className="ghost" onClick={saveText}>Kaydet</button>
           <button onClick={() => annotate(false)} disabled={annState.busy || !rawText.trim()}>
-            {annState.busy ? 'Üretiliyor…' : 'Script üret (LLM)'}
+            <Icon name="wave" /> {annState.busy ? 'Üretiliyor…' : 'Script üret (LLM)'}
           </button>
+          {annState.busy && <Eq />}
           {annState.busy && annState.totalChunks > 0 && <span className="muted">{annState.chunk}/{annState.totalChunks} parça</span>}
         </p>
         {annState.busy && annState.totalChunks > 1 && <progress value={annState.chunk} max={annState.totalChunks} />}
@@ -151,11 +166,11 @@ export default function ChapterPage() {
 
       <div className="card">
         <h2>
-          Seslendirme script’i{' '}
+          <span className="stage">02</span> Seslendirme script’i
           {script && (
             <span className="muted">
-              (v{script.version}, {script.segmentCount} segment, {script.source === 'llm' ? 'LLM' : 'elle'}
-              {script.usage ? `, ${script.usage.inputTokens}+${script.usage.outputTokens} token` : ''})
+              v{script.version} · {script.segmentCount} segment · {script.source === 'llm' ? 'LLM' : 'elle'}
+              {script.usage ? ` · ${script.usage.inputTokens}+${script.usage.outputTokens} token` : ''}
             </span>
           )}
         </h2>
@@ -166,7 +181,7 @@ export default function ChapterPage() {
             <tbody>
               {cast.map((c) => (
                 <tr key={c.character_id}>
-                  <td>{c.display_name}</td>
+                  <td><span className="row" style={{ gap: '0.4rem' }}><Icon name="person" /> {c.display_name}</span></td>
                   <td className="muted">{c.base_style ?? ''}</td>
                   <td>
                     <select value={c.voice_id} onChange={(e) => changeVoice(c.character_id, e.target.value)} style={{ maxWidth: '16rem' }}>
@@ -184,28 +199,35 @@ export default function ChapterPage() {
         {script && (
           <p className="row">
             <input value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Ek talimat (ör. daha az segment, Kaan daha öfkeli)" />
-            <button onClick={() => annotate(true)} disabled={annState.busy}>Yeniden üret</button>
+            <button className="ghost" onClick={() => annotate(true)} disabled={annState.busy}><Icon name="pencil" /> Yeniden üret</button>
           </p>
         )}
 
+        {!script && !annState.busy && (
+          <EmptyState icon="doc" title="Henüz script yok">Ham metni kaydedip “Script üret (LLM)” ile başla — ya da aşağıdan elle JSON yapıştır.</EmptyState>
+        )}
+
         <details>
-          <summary className="muted">Elle JSON yapıştır (gelişmiş)</summary>
+          <summary>Elle JSON yapıştır (gelişmiş)</summary>
           <p><textarea value={scriptJson} onChange={(e) => setScriptJson(e.target.value)} placeholder="JSON script’i buraya yapıştır" /></p>
-          <button onClick={saveScript} disabled={!scriptJson.trim()}>Script kaydet</button>
+          <button className="ghost" onClick={saveScript} disabled={!scriptJson.trim()}>Script kaydet</button>
         </details>
         {scriptErr && <p className="err">{scriptErr}</p>}
       </div>
 
       <div className="card">
-        <h2>Üretim</h2>
+        <h2><span className="stage">03</span> Üretim {genState.busy && <Icon name="spinner" />}</h2>
         <p className="row">
-          <button onClick={generate} disabled={!script || genState.busy}>{genState.busy ? 'Üretiliyor…' : 'Üret'}</button>
+          <button onClick={generate} disabled={!script || genState.busy}>
+            <Icon name="play" /> {genState.busy ? 'Üretiliyor…' : 'Üret'}
+          </button>
+          {genState.busy && <Eq />}
           {genState.busy && <span className="muted">{genState.done}/{genState.total} segment</span>}
         </p>
         {genState.total > 0 && <progress value={genState.done} max={genState.total} />}
         {genState.err && <p className="err">{genState.err}</p>}
         {renders.map((r) => (
-          <p key={r.id} className="row">
+          <p key={r.id} className="player">
             <audio controls src={`/api/audio/${r.path}`} />
             <span className="muted">{r.durationSec ? `${r.durationSec.toFixed(1)} sn` : ''} · {new Date(r.createdAt).toLocaleString('tr-TR')}</span>
           </p>
@@ -214,14 +236,16 @@ export default function ChapterPage() {
 
       {segments.length > 0 && (
         <div className="card">
-          <h2>Segmentler</h2>
+          <h2><Icon name="speaker" /> Segmentler <span className="muted">{segments.length}</span></h2>
           <table>
             <thead><tr><th>#</th><th>Konuşan</th><th>Stil</th><th>Metin</th><th>Durum</th></tr></thead>
             <tbody>
               {segments.map((s) => (
                 <tr key={s.id}>
-                  <td>{s.idx + 1}</td><td>{s.speaker}</td><td className="muted">{s.style ?? ''}</td>
-                  <td>{s.text.length > 80 ? s.text.slice(0, 80) + '…' : s.text}</td>
+                  <td className="mono">{s.idx + 1}</td>
+                  <td>{s.speaker}</td>
+                  <td className="muted">{s.style ?? ''}</td>
+                  <td className="mono">{s.text.length > 80 ? s.text.slice(0, 80) + '…' : s.text}</td>
                   <td><span className={`badge ${s.status}`}>{s.status}</span>{s.error && <div className="err">{s.error}</div>}</td>
                 </tr>
               ))}
