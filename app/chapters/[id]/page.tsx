@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { VOICE_POOL } from '@/lib/voices-pool';
 import { Icon } from '@/lib/ui/Icon';
 import { EmptyState } from '@/lib/ui/EmptyState';
 import { refreshTree } from '@/lib/ui/refresh';
@@ -13,6 +12,7 @@ type Render = { id: string; path: string; durationSec: number | null; createdAt:
 type CastMember = { character_id: string; display_name: string; voice_id: string; base_style?: string };
 type ScriptInfo = { id: string; version: number; segmentCount: number; source: string; usage: { inputTokens: number; outputTokens: number; chunks: number } | null };
 type Detail = { chapter: Chapter; script: ScriptInfo | null; cast: CastMember[]; segments: Segment[]; renders: Render[] };
+type PoolVoice = { voiceId: string; gender: string; tone: string };
 
 // POST + SSE: EventSource sadece GET desteklediği için fetch-stream ile okunur.
 async function streamSse(url: string, body: unknown, onEvent: (ev: string, data: any) => void) {
@@ -50,11 +50,12 @@ export default function ChapterPage() {
   const [scriptJson, setScriptJson] = useState('');
   const [scriptErr, setScriptErr] = useState('');
   const [annState, setAnnState] = useState<{ busy: boolean; chunk: number; totalChunks: number; err: string }>({ busy: false, chunk: 0, totalChunks: 0, err: '' });
-  type Preflight = { total: number; cached: number; newCalls: number; quota: { provider: string; used: number; limit: number; remaining: number } | null; fits: boolean };
+  type Preflight = { total: number; cached: number; newCalls: number; supportsStyle: boolean; styledSegments: number; providerMismatch: boolean; quota: { provider: string; used: number; limit: number; remaining: number } | null; fits: boolean };
   const [pf, setPf] = useState<Preflight | null>(null);
   const [genState, setGenState] = useState<{ busy: boolean; done: number; total: number; err: string; paused: { reason: string; jobId: string } | null }>({ busy: false, done: 0, total: 0, err: '', paused: null });
   const [playingSeg, setPlayingSeg] = useState<string | null>(null);
   const [regenBusy, setRegenBusy] = useState<string | null>(null);
+  const [voicePool, setVoicePool] = useState<PoolVoice[]>([]);
   const esRef = useRef<EventSource | null>(null);
 
   async function load() {
@@ -69,12 +70,21 @@ export default function ChapterPage() {
     if (d.script) loadPreflight();
     if (d.chapter.status === 'generating') watchProgress();
   }
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); loadVoicePool(); }, [id]);
   useEffect(() => () => esRef.current?.close(), []);
 
   async function loadPreflight() {
     const res = await fetch(`/api/chapters/${id}/preflight`);
     setPf(res.ok ? await res.json() : null);
+  }
+
+  // Karakter sesi düzeltme dropdown'u: aktif TTS sağlayıcısının havuzu (Dilim C2 — sağlayıcı-bazlı).
+  async function loadVoicePool() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) { setVoicePool([]); return; }
+    const s: { provider: string; voices: Record<string, { voice: string; gender: string; tone: string }[]> } = await res.json();
+    const rows = s.voices[s.provider] ?? [];
+    setVoicePool(rows.map((v) => ({ voiceId: `${s.provider}:${v.voice}`, gender: v.gender, tone: v.tone })));
   }
 
   // Üretimi izle: EventSource (GET SSE). Bağlantı kopması işi etkilemez.
@@ -177,8 +187,9 @@ export default function ChapterPage() {
 
   if (!detail) return <p className="muted">Yükleniyor…</p>;
   const { chapter, script, cast, segments, renders } = detail;
+  // Havuz aktif sağlayıcıdan gelir; mevcut ses havuzda değilse (ör. sağlayıcı değişti) tek başına eklenir.
   const voiceOptions = (current: string) =>
-    VOICE_POOL.some((v) => v.voiceId === current) ? VOICE_POOL : [{ voiceId: current, gender: 'male' as const, tone: 'mevcut' }, ...VOICE_POOL];
+    voicePool.some((v) => v.voiceId === current) ? voicePool : [{ voiceId: current, gender: '', tone: 'mevcut' }, ...voicePool];
 
   return (
     <>
@@ -276,6 +287,12 @@ export default function ChapterPage() {
             {pf.total} segment · {pf.cached} önbellekte · <strong>{pf.newCalls} yeni çağrı</strong>
             {pf.quota && <> · {pf.quota.provider} bugün {pf.quota.used}/{pf.quota.limit}</>}
           </p>
+        )}
+        {pf && !pf.supportsStyle && pf.styledSegments > 0 && (
+          <p className="muted"><Icon name="warn" size={12} /> Bu sağlayıcı stil desteklemiyor — segmentler düz okunur.</p>
+        )}
+        {pf && pf.providerMismatch && (
+          <p className="muted"><Icon name="warn" size={12} /> Script başka bir sağlayıcı için hazırlanmış — üretim başarısız olur. Yeniden annotate edin veya cast seslerini düzeltin.</p>
         )}
         <p className="row">
           {(!pf || pf.fits) && (

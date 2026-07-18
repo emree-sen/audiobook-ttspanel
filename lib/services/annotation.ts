@@ -7,7 +7,9 @@ import { llmChunkSchema, type LlmCast, type LlmChunk } from '../llm/schema';
 import { GeminiLlmAdapter } from '../llm/gemini';
 import { MockLlmAdapter } from '../llm/mock';
 import type { LlmAdapter } from '../llm/types';
-import { DEFAULT_NARRATOR_VOICE, pickVoice } from '../voices-pool';
+import { loadPool, pickVoice } from '../voices-pool';
+import { geminiApiKey } from './generation';
+import { activeProvider } from './quota';
 
 export interface AnnotateOutcome {
   scriptId: string; version: number; segmentCount: number; castCount: number;
@@ -19,8 +21,8 @@ const CHUNK_TARGET = 12_000; // karakter; Gemini flash çıktı limitine güvenl
 export function llmAdapterFromSettings(db: Db): LlmAdapter {
   const provider = getSetting(db, 'llm_provider') ?? process.env.LLM_PROVIDER ?? 'gemini';
   if (provider === 'mock') return new MockLlmAdapter();
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error('GEMINI_API_KEY tanımlı değil (.env)');
+  const key = geminiApiKey(db);
+  if (!key) throw new Error('Gemini API anahtarı yok — Ayarlar’dan girin veya .env GEMINI_API_KEY tanımlayın');
   return new GeminiLlmAdapter(key, getSetting(db, 'llm_model') ?? process.env.LLM_MODEL);
 }
 
@@ -64,6 +66,12 @@ export async function annotateChapter(
   const voiceMode = chapter.voiceMode === 'multi' ? ('multi' as const) : ('narrator' as const);
   const chunks = chunkText(chapter.rawText);
 
+  // Havuz aktif TTS sağlayıcısından; mock test altyapısıdır, gemini havuzunu kullanır.
+  const providerName = activeProvider(db).name;
+  const pool = loadPool(db, providerName === 'mock' ? 'gemini' : providerName);
+  const narratorVoice = getSetting(db, 'default_voice') ?? pool[0]?.voiceId;
+  if (!narratorVoice) throw new Error('Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin');
+
   // Yeniden üretimde önceki denemenin kısa özeti prompt'a girer.
   let prevSummary: string | undefined;
   if (opts?.instruction) {
@@ -93,15 +101,14 @@ export async function annotateChapter(
     opts?.onProgress?.(i + 1, chunks.length);
   }
 
-  // Ses ataması: anlatıcı = default_voice ?? DEFAULT_NARRATOR_VOICE; karakterler havuzdan (§2.2).
-  const narratorVoice = getSetting(db, 'default_voice') ?? DEFAULT_NARRATOR_VOICE;
+  // Ses ataması: anlatıcı yukarıda hesaplandı; karakterler havuzdan (§2.2).
   const used = new Set<string>([narratorVoice]);
   const cast = [
     { character_id: 'narrator', display_name: 'Anlatıcı', voice_id: narratorVoice, base_style: chapter.narrationStyle ?? undefined },
     ...(voiceMode === 'multi'
       ? knownCast.filter((c) => c.character_id !== 'narrator').map((c) => ({
           character_id: c.character_id, display_name: c.display_name,
-          voice_id: pickVoice(c.gender, used), base_style: c.persona,
+          voice_id: pickVoice(pool, c.gender, used), base_style: c.persona,
         }))
       : []),
   ];

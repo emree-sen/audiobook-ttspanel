@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Gizli-olmayan varsayılanlar: provider, model, single_voice, default_voice
 export const settings = sqliteTable('settings', {
@@ -97,3 +97,23 @@ export const audioCache = sqliteTable('audio_cache', {
   usd: real('usd').notNull().default(0),
   createdAt: integer('created_at').notNull(),
 });
+
+export const ttsConnections = sqliteTable('tts_connections', {
+  id: text('id').primaryKey(), // kullanıcı slug'ı (^[a-z0-9-]{2,32}$); kota/cache/ses kimliklerinde sağlayıcı adı
+  label: text('label').notNull().default(''),
+  baseUrl: text('base_url').notNull(), // "/v1" dahil, ör. http://localhost:8000/v1
+  apiKey: text('api_key'),             // null = anahtarsız lokal sunucu
+  model: text('model').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const voices = sqliteTable('voices', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(), // gemini | piper | <bağlantı slug'ı>
+  voice: text('voice').notNull(),
+  gender: text('gender').notNull().default(''), // male|female|'' (bilinmiyor)
+  tone: text('tone').notNull().default(''),
+  path: text('path'), // yalnız piper: .onnx dosya yolu
+  createdAt: integer('created_at').notNull(),
+}, (t) => [uniqueIndex('voices_provider_voice').on(t.provider, t.voice)]);

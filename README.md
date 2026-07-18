@@ -8,7 +8,8 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 - ✅ Web panel (Dilim A): proje/bölüm yönetimi, script import, üretim + dinleme
 - ✅ LLM annotation: ham metin + anlatım tarzı + ses modu → otomatik script (Gemini, BYO-key); ek talimatla yeniden üretme; cast ses düzeltme
 - ✅ Üretim hattı: DB-destekli kuyruk (tarayıcı kapansa da sürer), preflight çağrı hesabı + günlük kota göstergesi, kotaya çarpınca duraklat/devam, content-hash önbelleği (değişmeyen segment tekrar TTS'e gitmez), segment başına dinleme + tek-segment yeniden üretme
-- ⬜ Sağlayıcı ekosistemi (OpenAI-uyumlu endpoint + Piper lokal TTS + ayarlar ekranı), PWA oynatıcı
+- ✅ Sağlayıcı ekosistemi (Dilim C2): OpenAI-uyumlu bağlantılar + Piper lokal TTS, Ayarlar ekranı, sağlayıcı-bazlı ses havuzu, stilsiz sağlayıcılarda otomatik stil düşürme notu
+- ⬜ Kütüphane + PWA oynatıcı
 
 ## Kurulum
 
@@ -25,6 +26,32 @@ npm run dev            # http://localhost:3000
 > **Uyarı:** `PANEL_PASSWORD` boşsa panel şifresiz açılır — yalnızca lokal geliştirme için. İnternete açacaksan mutlaka doldur.
 
 Üretim (production) için: `npm run build && npm start`.
+
+## TTS Sağlayıcıları
+
+Aktif sağlayıcı ve tüm yapılandırma panel içinden yönetilir: **Ayarlar** (sol panelin altı).
+
+### Gemini (varsayılan)
+API anahtarını `.env` (`GEMINI_API_KEY`) veya Ayarlar ekranından gir. Ücretsiz katmanda
+günde ~100 istek sınırı vardır; panel preflight + kota defteriyle bunu yönetir.
+
+### OpenAI-uyumlu sunucular (lokal veya bulut)
+`/v1/audio/speech` uygulayan her sunucu: OpenAI TTS, [AllTalk](https://github.com/erew123/alltalk_tts),
+[openedai-speech](https://github.com/matatonic/openedai-speech), LocalAI…
+Ayarlar → "OpenAI-uyumlu bağlantılar" → ad + URL (`/v1` dahil, ör. `http://localhost:8000/v1`) +
+model + (gerekiyorsa) anahtar. Bağlantının ses havuzunu elle doldur veya "Resmî OpenAI seslerini ekle".
+Not: sunucu `response_format: "wav"` desteklemeli (yaygın durum).
+
+### Piper (ücretsiz, lokal, CPU)
+1. [Piper sürümünü](https://github.com/OHF-Voice/piper1-gpl/releases) indir, bir klasöre aç (`piper.exe`).
+2. Türkçe ses modeli indir (`.onnx` + `.onnx.json` YAN YANA aynı klasörde):
+   [tr_TR-fahrettin-medium](https://huggingface.co/rhasspy/piper-voices/tree/main/tr/tr_TR/fahrettin/medium),
+   [tr_TR-dfki-medium](https://huggingface.co/rhasspy/piper-voices/tree/main/tr/tr_TR/dfki/medium),
+   [tr_TR-fettah-medium](https://huggingface.co/rhasspy/piper-voices/tree/main/tr/tr_TR/fettah/medium).
+3. Ayarlar → Piper: exe yolunu gir, model dosyalarını ekle (ses adı dosya adından türer).
+
+Stil/duygu yönergelerini yalnız Gemini uygular; diğer sağlayıcılarda segmentler düz okunur
+(panel preflight satırında not gösterir).
 
 ## Kullanım
 

@@ -1,24 +1,23 @@
-export interface PoolVoice { voiceId: string; gender: 'male' | 'female'; tone: string }
+import { asc, eq } from 'drizzle-orm';
+import type { Db } from './db/client';
+import { voices } from './db/schema';
 
-// Bake-off'ta doğrulanmış Gemini prebuilt sesleri (etiketler UI/atama için; genişletilebilir).
-export const VOICE_POOL: PoolVoice[] = [
-  { voiceId: 'gemini:Charon', gender: 'male', tone: 'olgun, anlatıcı' },
-  { voiceId: 'gemini:Iapetus', gender: 'male', tone: 'derin' },
-  { voiceId: 'gemini:Puck', gender: 'male', tone: 'genç, enerjik' },
-  { voiceId: 'gemini:Algenib', gender: 'male', tone: 'sert' },
-  { voiceId: 'gemini:Algieba', gender: 'male', tone: 'yumuşak' },
-  { voiceId: 'gemini:Schedar', gender: 'male', tone: 'ölçülü' },
-  { voiceId: 'gemini:Kore', gender: 'female', tone: 'bilge, sakin' },
-  { voiceId: 'gemini:Leda', gender: 'female', tone: 'genç, canlı' },
-];
+export interface PoolVoice { voiceId: string; gender: string; tone: string }
 
-export const DEFAULT_NARRATOR_VOICE = 'gemini:Charon';
+// Sağlayıcının ses havuzu: voices tablosundan, ekleniş sırasıyla (tohum: Charon ilk).
+export function loadPool(db: Db, provider: string): PoolVoice[] {
+  return db.select().from(voices).where(eq(voices.provider, provider))
+    .orderBy(asc(voices.createdAt), asc(voices.id)).all()
+    .map((v) => ({ voiceId: `${v.provider}:${v.voice}`, gender: v.gender, tone: v.tone }));
+}
 
-// Cinsiyete uygun, kullanılmamış ilk ses; havuz biterse deterministik döngü.
-export function pickVoice(gender: string, used: Set<string>): string {
-  const candidates = gender === 'male' || gender === 'female' ? VOICE_POOL.filter((v) => v.gender === gender) : VOICE_POOL;
-  const free = candidates.filter((v) => !used.has(v.voiceId));
-  const pick = (free[0] ?? candidates[used.size % candidates.length] ?? VOICE_POOL[0]).voiceId;
+// Cinsiyete uygun, kullanılmamış ilk ses; cinsiyet tutmuyorsa tüm havuz; havuz biterse deterministik döngü.
+export function pickVoice(pool: PoolVoice[], gender: string, used: Set<string>): string {
+  if (pool.length === 0) throw new Error('Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin');
+  const candidates = gender === 'male' || gender === 'female' ? pool.filter((v) => v.gender === gender) : pool;
+  const base = candidates.length ? candidates : pool;
+  const free = base.filter((v) => !used.has(v.voiceId));
+  const pick = (free[0] ?? base[used.size % base.length]).voiceId;
   used.add(pick);
   return pick;
 }

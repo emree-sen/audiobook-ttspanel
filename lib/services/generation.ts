@@ -2,19 +2,47 @@ import { desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { renders } from '../db/schema';
 import { getSetting } from './settings';
+import { activeProvider } from './quota';
+import { getConnection } from './connections';
+import { listVoices } from './voices';
 import { MockAdapter } from '@/src/core/tts/mock';
 import { GeminiAdapter } from '@/src/core/tts/gemini';
+import { OpenAiCompatAdapter } from '@/src/core/tts/openai';
+import { PiperAdapter } from '@/src/core/tts/piper';
 import type { TtsAdapter } from '@/src/core/types';
 
 export type RenderRow = typeof renders.$inferSelect;
 
-// Ayarlar (settings tablosu) → env → varsayılan sırasıyla adapter kur.
+// Gemini anahtarı: ayarlar (DB) → env. TTS ve LLM aynı anahtarı paylaşır.
+export function geminiApiKey(db: Db): string | undefined {
+  return getSetting(db, 'gemini_api_key') ?? process.env.GEMINI_API_KEY ?? undefined;
+}
+
+// Stil desteği sağlayıcı ADINDAN belirlenir (adapter kurmadan — preflight anahtarsız da çalışmalı).
+export function supportsStyle(provider: string): boolean {
+  return provider === 'gemini' || provider === 'mock';
+}
+
+// Ayarlar (settings) → env → varsayılan sırasıyla aktif sağlayıcının adapter'ını kurar.
 export function adapterFromSettings(db: Db): TtsAdapter {
-  const provider = getSetting(db, 'provider') ?? process.env.TTS_PROVIDER ?? 'gemini';
+  const { name: provider, model } = activeProvider(db);
   if (provider === 'mock') return new MockAdapter();
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error('GEMINI_API_KEY tanımlı değil (.env)');
-  return new GeminiAdapter(key, getSetting(db, 'model') ?? process.env.TTS_MODEL);
+  if (provider === 'gemini') {
+    const key = geminiApiKey(db);
+    if (!key) throw new Error('Gemini API anahtarı yok — Ayarlar’dan girin veya .env GEMINI_API_KEY tanımlayın');
+    return new GeminiAdapter(key, model || undefined);
+  }
+  if (provider === 'piper') {
+    const exe = getSetting(db, 'piper_exe');
+    if (!exe) throw new Error('Piper exe yolu tanımsız — Ayarlar’dan girin');
+    const models: Record<string, string> = {};
+    for (const v of listVoices(db, 'piper')) if (v.path) models[v.voice] = v.path;
+    if (Object.keys(models).length === 0) throw new Error('Piper ses modeli yok — Ayarlar’dan .onnx ekleyin');
+    return new PiperAdapter({ exePath: exe, models });
+  }
+  const conn = getConnection(db, provider);
+  if (!conn) throw new Error(`Bilinmeyen TTS sağlayıcısı: "${provider}" — Ayarlar’dan bağlantı tanımlayın`);
+  return new OpenAiCompatAdapter({ id: conn.id, baseUrl: conn.baseUrl, apiKey: conn.apiKey, model: conn.model });
 }
 
 export function listRenders(db: Db, chapterId: string): RenderRow[] {

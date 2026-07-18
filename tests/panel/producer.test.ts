@@ -152,6 +152,26 @@ describe('runJob', () => {
   });
 });
 
+describe('stil düşürme (yetenek bildirimi)', () => {
+  test('stil desteklemeyen sağlayıcıda synthesize istekleri stilsiz gider', async () => {
+    const { db, chapterId } = setup();
+    setSetting(db, 'provider', 'piper');
+    const seen: { style?: string; tags?: string[] }[] = [];
+    const spy: TtsAdapter = {
+      id: 'piper',
+      capabilities: { style: false },
+      async synthesize(req: TtsSegmentRequest): Promise<TtsResult> {
+        seen.push({ style: req.style, tags: req.tags });
+        return new MockAdapter().synthesize(req);
+      },
+    };
+    const job = enqueueJob(db, chapterId);
+    await runJob(db, job.id, spy);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((r) => r.style === undefined && (r.tags === undefined || r.tags.length === 0))).toBe(true);
+  });
+});
+
 describe('recover + worker', () => {
   test('running kalmış iş queued\'a döner; ensureWorker bitirir', async () => {
     const { db, chapterId } = setup();
