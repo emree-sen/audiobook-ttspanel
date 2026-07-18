@@ -9,6 +9,7 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 - ✅ LLM annotation: ham metin + anlatım tarzı + ses modu → otomatik script (Gemini, BYO-key); ek talimatla yeniden üretme; cast ses düzeltme
 - ✅ Üretim hattı: DB-destekli kuyruk (tarayıcı kapansa da sürer), preflight çağrı hesabı + günlük kota göstergesi, kotaya çarpınca duraklat/devam, content-hash önbelleği (değişmeyen segment tekrar TTS'e gitmez), segment başına dinleme + tek-segment yeniden üretme
 - ✅ Sağlayıcı ekosistemi (Dilim C2): OpenAI-uyumlu bağlantılar + Piper lokal TTS, Ayarlar ekranı, sağlayıcı-bazlı ses havuzu, stilsiz sağlayıcılarda otomatik stil düşürme notu
+- ✅ Üretim akışı iyileştirmeleri (Dilim C3): anlatıcı modunda az-segment (paragraf kuralı + birleştirme), script/segment satır düzenleme, ayrı "Birleştir" adımı (segmentler hazır → `voiced` → mp3), TTS süre bekçisi (absürt uzunlukta otomatik yeniden deneme), dev'de çift-worker kota israfı düzeltmesi
 - ⬜ Kütüphane + PWA oynatıcı
 
 ## Kurulum
@@ -57,7 +58,7 @@ Stil/duygu yönergelerini yalnız Gemini uygular; diğer sağlayıcılarda segme
 
 1. Panelde proje → bölüm oluştur, ham metnini yapıştır; anlatım tarzını ve ses modunu (tek anlatıcı / çok karakterli) seç.
 2. **"Script üret (LLM)"** → sistem metni segmentlere ayırır, duygu/stil etiketler, karakterlere havuzdan ses atar. Beğenmezsen ek talimat yazıp **"Yeniden üret"**; karakter sesini listeden değiştir.
-3. "Üret" → segment segment TTS + birleştirme → tarayıcıda dinle.
+3. "Üret" → segment segment TTS. Üretim bitince segmentleri dinleyip düzelt (gerekirse metni değiştirip yeniden üret), ardından **"Birleştir"** ile tek mp3'e dönüştür ve tarayıcıda dinle.
 
 Ücretsiz deneme: `.env`'de `TTS_PROVIDER=mock` ve `LLM_PROVIDER=mock` (API çağrısı yapmaz). Elle JSON script yapıştırma "gelişmiş" bölümünde durur (şema: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md` §6).
 
