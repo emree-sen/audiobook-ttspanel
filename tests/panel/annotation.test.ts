@@ -4,6 +4,8 @@ import { createProject } from '@/lib/services/projects';
 import { createChapter, getChapter, updateChapter } from '@/lib/services/chapters';
 import { latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
+import { createConnection } from '@/lib/services/connections';
+import { addVoice } from '@/lib/services/voices';
 import { annotateChapter, chunkText, llmAdapterFromSettings } from '@/lib/services/annotation';
 import { MockLlmAdapter } from '@/lib/llm/mock';
 import type { LlmAdapter } from '@/lib/llm/types';
@@ -169,6 +171,36 @@ describe('annotateChapter (MockLlmAdapter)', () => {
 
     const json = JSON.parse(latestScript(db, c.id)!.json);
     expect(json.cast.filter((cc: any) => cc.character_id === 'kisi1')).toHaveLength(1);
+  });
+});
+
+describe('havuz aktif TTS sağlayıcısından gelir', () => {
+  test('sağlayıcı bağlantıysa voice_id o slug ile başlar', async () => {
+    const { db, chapterId } = setup('multi');
+    createConnection(db, { id: 'sunucum', baseUrl: 'http://x/v1', model: 'm' });
+    addVoice(db, { provider: 'sunucum', voice: 'alloy', gender: 'male' });
+    setSetting(db, 'provider', 'sunucum');
+    await annotateChapter(db, chapterId, new MockLlmAdapter());
+    const script = JSON.parse(latestScript(db, chapterId)!.json);
+    expect(script.cast.every((c: { voice_id: string }) => c.voice_id.startsWith('sunucum:'))).toBe(true);
+  });
+
+  test('aktif sağlayıcının havuzu boşsa LLM çağrısı YAPILMADAN Türkçe hata', async () => {
+    const { db, chapterId } = setup('narrator');
+    createConnection(db, { id: 'bos', baseUrl: 'http://x/v1', model: 'm' });
+    setSetting(db, 'provider', 'bos');
+    let called = false;
+    const spy: LlmAdapter = { id: 'spy', annotate(req) { called = true; return new MockLlmAdapter().annotate(req); } };
+    await expect(annotateChapter(db, chapterId, spy)).rejects.toThrow(/havuzu boş/);
+    expect(called).toBe(false);
+  });
+
+  test('mock TTS sağlayıcısı gemini havuzunu kullanır (test altyapısı istisnası)', async () => {
+    const { db, chapterId } = setup('narrator');
+    setSetting(db, 'provider', 'mock');
+    await annotateChapter(db, chapterId, new MockLlmAdapter());
+    const script = JSON.parse(latestScript(db, chapterId)!.json);
+    expect(script.cast[0].voice_id).toBe('gemini:Charon');
   });
 });
 

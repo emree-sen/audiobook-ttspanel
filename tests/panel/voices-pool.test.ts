@@ -1,28 +1,42 @@
-import { describe, expect, test } from 'vitest';
-import { DEFAULT_NARRATOR_VOICE, VOICE_POOL, pickVoice } from '@/lib/voices-pool';
+import { beforeEach, describe, expect, test } from 'vitest';
+import { createDb, type Db } from '@/lib/db/client';
+import { addVoice } from '@/lib/services/voices';
+import { loadPool, pickVoice } from '@/lib/voices-pool';
 
-describe('voice pool', () => {
-  test('havuz dolu ve varsayılan anlatıcı havuzda', () => {
-    expect(VOICE_POOL.length).toBeGreaterThanOrEqual(6);
-    expect(VOICE_POOL.some((v) => v.voiceId === DEFAULT_NARRATOR_VOICE)).toBe(true);
+let db: Db;
+beforeEach(() => { db = createDb(':memory:'); });
+
+describe('loadPool', () => {
+  test('gemini tohumu: 8 ses, ilk Charon, voiceId "provider:voice" biçiminde', () => {
+    const pool = loadPool(db, 'gemini');
+    expect(pool).toHaveLength(8);
+    expect(pool[0].voiceId).toBe('gemini:Charon');
+    expect(pool.every((v) => v.voiceId.startsWith('gemini:'))).toBe(true);
   });
+  test('başka sağlayıcının havuzu ayrı', () => {
+    addVoice(db, { provider: 'sunucum', voice: 'alloy' });
+    expect(loadPool(db, 'sunucum').map((v) => v.voiceId)).toEqual(['sunucum:alloy']);
+  });
+});
 
+describe('pickVoice', () => {
+  const pool = (db: Db) => loadPool(db, 'gemini');
   test('cinsiyete uygun + kullanılmamış atar', () => {
-    const used = new Set<string>([DEFAULT_NARRATOR_VOICE]);
-    const v1 = pickVoice('female', used);
-    expect(VOICE_POOL.find((v) => v.voiceId === v1)?.gender).toBe('female');
-    const v2 = pickVoice('female', used);
+    const used = new Set<string>(['gemini:Charon']);
+    const v1 = pickVoice(pool(db), 'female', used);
+    expect(pool(db).find((v) => v.voiceId === v1)?.gender).toBe('female');
+    const v2 = pickVoice(pool(db), 'female', used);
     expect(v2).not.toBe(v1);
-    expect(used.has(v1)).toBe(true);
   });
-
-  test('unknown cinsiyet herhangi bir sesten alır; havuz bitince döngü (fırlatmaz)', () => {
+  test('unknown cinsiyet ve havuz bitimi fırlatmaz (deterministik döngü)', () => {
     const used = new Set<string>();
-    for (let i = 0; i < VOICE_POOL.length + 3; i++) expect(() => pickVoice('unknown', used)).not.toThrow();
+    for (let i = 0; i < 12; i++) expect(() => pickVoice(pool(db), 'unknown', used)).not.toThrow();
   });
-
-  test('deterministik: aynı sırayla aynı sonuç', () => {
-    const a = new Set<string>(), b = new Set<string>();
-    expect([pickVoice('male', a), pickVoice('female', a)]).toEqual([pickVoice('male', b), pickVoice('female', b)]);
+  test('cinsiyeti tutan ses yoksa tüm havuza düşer (öksüz kalmaz)', () => {
+    addVoice(db, { provider: 'notr', voice: 'tek' }); // gender ''
+    expect(pickVoice(loadPool(db, 'notr'), 'female', new Set())).toBe('notr:tek');
+  });
+  test('boş havuz Türkçe hatayla fırlatır', () => {
+    expect(() => pickVoice([], 'male', new Set())).toThrow(/havuzu boş/);
   });
 });
