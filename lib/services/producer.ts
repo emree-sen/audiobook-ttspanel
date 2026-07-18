@@ -12,7 +12,7 @@ import { planChapter } from './preflight';
 import { adapterFromSettings } from './generation';
 import { parseVoiceId } from '@/src/core/voices';
 import { concatSegmentsToWav, wavToMp3 } from '@/src/core/audio/stitch';
-import type { TtsAdapter } from '@/src/core/types';
+import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '@/src/core/types';
 
 export type JobRow = typeof jobs.$inferSelect;
 
@@ -77,6 +77,20 @@ async function saveSegmentAudio(db: Db, segmentRowId: string, hash: string, audi
     .where(eq(segments.id, segmentRowId)).run();
 }
 
+// KN1: preview TTS bazen metni tekrarlayıp uzun sessizlik üretir (saha: 34 karakter → 14 sn).
+// Süre, makul tavanı aşarsa 1 kez yeniden dener ve KISA sonucu kullanır. attempts, defter
+// dürüstlüğü için döner (her deneme gerçek bir API çağrısıdır). Deneme patlarsa ilk sonuç kalır.
+export const DURATION_GUARD_MS_PER_CHAR = 250;
+export const DURATION_GUARD_MIN_MS = 4000;
+export async function synthesizeChecked(adapter: TtsAdapter, req: TtsSegmentRequest): Promise<{ result: TtsResult; attempts: number }> {
+  const maxMs = Math.max(DURATION_GUARD_MIN_MS, req.text.length * DURATION_GUARD_MS_PER_CHAR);
+  const first = await adapter.synthesize(req);
+  if (first.durationMs <= maxMs) return { result: first, attempts: 1 };
+  let second: TtsResult | undefined;
+  try { second = await adapter.synthesize(req); } catch { /* bekçi denemesi patladı — ilk sonuç kullanılır */ }
+  return { result: second && second.durationMs < first.durationMs ? second : first, attempts: 2 };
+}
+
 export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promise<void> {
   // KN2: işi atomik sahiplen — aynı queued işi ikinci bir worker alamaz (dev'de rota-başına
   // modül örneği ensureWorker tekilliğini kırabiliyordu; kota 2x yanıyordu).
@@ -113,12 +127,14 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
         return;
       }
       try {
-        const res = await adapter.synthesize({
+        const { result: res, attempts } = await synthesizeChecked(adapter, {
           text: item.text, voice: parseVoiceId(item.voiceId), language: script.language,
           style: item.style, tags: item.tags, pronunciations: script.pronunciations,
         });
-        callsUsed++;
-        recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: res.cost.usd ?? 0 });
+        callsUsed += attempts;
+        // Her deneme deftere yazılır; usd yalnız kullanılan sonuca (bekçi denemesi 0 ile kaydedilir).
+        for (let a = 0; a < attempts; a++)
+          recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: a === attempts - 1 ? res.cost.usd ?? 0 : 0 });
         await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
         setJob(db, job.id, { callsUsed, doneCount: ++doneCount });
       } catch (e) {
@@ -192,11 +208,12 @@ export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsA
   const { script, plan } = planChapter(db, row.chapterId, row.scriptId);
   const item = plan[row.idx];
   try {
-    const res = await adapter.synthesize({
+    const { result: res, attempts } = await synthesizeChecked(adapter, {
       text: item.text, voice: parseVoiceId(item.voiceId), language: script.language,
       style: item.style, tags: item.tags, pronunciations: script.pronunciations,
     });
-    recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: res.cost.usd ?? 0 });
+    for (let a = 0; a < attempts; a++)
+      recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: a === attempts - 1 ? res.cost.usd ?? 0 : 0 });
     await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
   } catch (e) {
     recordCall(db, { provider, model, segmentId: row.id, ok: false });

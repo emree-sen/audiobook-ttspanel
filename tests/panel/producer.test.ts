@@ -11,7 +11,7 @@ import { createChapter, getChapter } from '@/lib/services/chapters';
 import { importScript, latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
 import { listRenders } from '@/lib/services/generation';
-import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob } from '@/lib/services/producer';
+import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob, synthesizeChecked } from '@/lib/services/producer';
 import { MockAdapter } from '@/src/core/tts/mock';
 import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '@/src/core/types';
 
@@ -214,4 +214,59 @@ describe('recover + worker', () => {
     await ensureWorker(db); // tekrar çağrı — hâlâ duraklı kalmalı
     expect(latestJob(db, chapterId)!.doneCount).toBe(1);
   });
+});
+
+describe('synthesizeChecked (KN1 süre bekçisi)', () => {
+  const req = { text: 'Kısa bir cümle.', voice: { provider: 'mock', providerVoice: 'x' }, language: 'tr-TR' };
+  const fake = (durations: number[], failFrom = Infinity): TtsAdapter => {
+    let i = 0;
+    return { id: 'fake', async synthesize() {
+      if (i >= failFrom) { i++; throw new Error('deneme patladı'); }
+      const d = durations[Math.min(i++, durations.length - 1)];
+      return { audio: Buffer.alloc(4), format: 'wav' as const, durationMs: d, cost: { unit: 'chars' as const, amount: 5, usd: 0 } };
+    } };
+  };
+  test('makul süre: tek deneme', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([2000]), req);
+    expect(attempts).toBe(1);
+    expect(result.durationMs).toBe(2000);
+  });
+  test('absürt süre: 1 yeniden deneme, kısa sonuç seçilir', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000, 2200]), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(2200);
+  });
+  test('iki deneme de absürtse kısa olan kullanılır', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000, 20000]), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(14000);
+  });
+  test('yeniden deneme patlarsa ilk sonuç kullanılır (başarı bozulmaz)', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000], 1), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(14000);
+  });
+  test('eşik: max(4000, uzunluk*250)', async () => {
+    // 15 karakter → tavan 4000 (taban); 4000 üstü tetikler, altı tetiklemez
+    const { attempts } = await synthesizeChecked(fake([3900]), req);
+    expect(attempts).toBe(1);
+  });
+});
+
+test('runJob bekçi denemelerini deftere yazar (attempts kadar kayıt + callsUsed)', async () => {
+  const { db, chapterId } = setup();
+  setSetting(db, 'provider', 'mock');
+  // ilk segmentte absürt, sonra normal süre veren adapter
+  let n = 0;
+  const spy: TtsAdapter = { id: 'mock', async synthesize(req) {
+    const base = await new MockAdapter().synthesize(req);
+    n++;
+    return n === 1 ? { ...base, durationMs: 999999 } : base;
+  } };
+  const job = enqueueJob(db, chapterId);
+  await runJob(db, job.id, spy);
+  const calls = db.select().from(ttsCalls).all();
+  expect(calls.length).toBe(6); // 5 segment + 1 bekçi denemesi
+  const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get()!;
+  expect(fresh.callsUsed).toBe(6);
 });
