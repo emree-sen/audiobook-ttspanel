@@ -22,7 +22,7 @@ listening_progress: chapter_id pk (fk chapters cascade) · position_sec real · 
   - Yalnız `done` (son render'ıyla, oynatılabilir) ve `voiced` (oynatılamaz — "Birleştir bekliyor") bölümler döner; `draft/scripted/generating/error` kütüphanede görünmez.
   - Son render = `renders` içinde en yenisi (mevcut `listRenders` sırası).
 - `PUT /api/progress/[chapterId]` gövde `{ positionSec: number, durationSec?: number }` → upsert, `{ ok: true }`. Doğrulama: sonlu, ≥ 0 sayılar; bilinmeyen bölüm 404.
-- Servis: `lib/services/library.ts` — `getLibrary(db)`, `saveProgress(db, chapterId, {positionSec, durationSec?})`, `nextPlayable(db, chapterId)` → kütüphane bölüm satırıyla aynı şekilde `{ id, title, position, renderPath, durationSec, progressSec } | null` (aynı projede `position` sırasına göre bir sonraki `done` bölüm; otomatik geçiş ve MediaSession "sonraki" için). "Devam et" seçimi: `updated_at` en yeni VE `positionSec < durationSec - 5` olan ilerleme kaydı.
+- Servis: `lib/services/library.ts` — `getLibrary(db)`, `saveProgress(db, chapterId, {positionSec, durationSec?})`. Otomatik "sonraki bölüm" için ayrı servis YOK: kütüphane sayfası oynatıcıya serinin oynatılabilir bölümlerini **sıralı kuyruk** olarak verir; `ended`/önceki-sonraki kuyruktan yürür (offline'da da çalışır — plan aşaması kararı, 2026-07-19). "Devam et" seçimi: `updated_at` en yeni VE `positionSec < durationSec - 5` olan ilerleme kaydı.
 
 ## 4. Global oynatıcı (`lib/ui/player/`)
 
