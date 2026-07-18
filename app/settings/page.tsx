@@ -92,6 +92,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
     if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? 'Kaydedilemedi');
     await load();
+    return res.ok;
   }
 
   async function addConnection() {
@@ -149,7 +150,7 @@ export default function SettingsPage() {
               {data.geminiKeySource === null && '—'}
             </span>
           </div>
-          <form className="row" onSubmit={async (e) => { e.preventDefault(); if (keyInput.trim()) { await put({ geminiKey: keyInput.trim() }); setKeyInput(''); } }}>
+          <form className="row" onSubmit={async (e) => { e.preventDefault(); if (keyInput.trim()) { if (await put({ geminiKey: keyInput.trim() })) setKeyInput(''); } }}>
             <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder="Yeni anahtar (DB&#39;ye kaydedilir)" autoComplete="off" />
             <button type="submit">Kaydet</button>
             {data.geminiKeySource === 'db' && <button type="button" className="ghost" onClick={() => put({ geminiKey: null })}>DB&#39;den sil</button>}
@@ -207,11 +208,14 @@ export default function SettingsPage() {
             <div key={p} className="rowitem">
               <span className="mono">{p}</span>
               <input
+                key={`${p}:${lim ?? ''}`}
                 type="number" min={1} defaultValue={lim ?? ''} placeholder="limitsiz" aria-label={`${p} günlük limit`}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
                   const n = v === '' ? null : Number(v);
-                  if (n !== lim && (n === null || (Number.isInteger(n) && n > 0))) put({ quotaLimits: { [p]: n } });
+                  if (n === lim) return;
+                  if (n === null || (Number.isInteger(n) && n > 0)) put({ quotaLimits: { [p]: n } });
+                  else setErr('Kota limiti pozitif tam sayı olmalı (boş = limitsiz)');
                 }}
                 style={{ maxWidth: '8rem' }}
               />
