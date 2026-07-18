@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { getChapter } from '@/lib/services/chapters';
-import { importScript } from '@/lib/services/scripts';
+import { importScript, latestScript } from '@/lib/services/scripts';
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const scr = latestScript(getDb(), id);
+  if (!scr) return NextResponse.json({ error: 'Bölümün script’i yok' }, { status: 404 });
+  return new Response(scr.json, { headers: { 'Content-Type': 'application/json' } });
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

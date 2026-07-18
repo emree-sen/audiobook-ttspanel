@@ -56,6 +56,8 @@ export default function ChapterPage() {
   const [playingSeg, setPlayingSeg] = useState<string | null>(null);
   const [regenBusy, setRegenBusy] = useState<string | null>(null);
   const [voicePool, setVoicePool] = useState<PoolVoice[]>([]);
+  const [stitchBusy, setStitchBusy] = useState(false);
+  const [editSeg, setEditSeg] = useState<{ id: string; text: string; style: string } | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   async function load() {
@@ -185,6 +187,38 @@ export default function ChapterPage() {
     } finally { setRegenBusy(null); }
   }
 
+  async function stitch() {
+    setStitchBusy(true);
+    try {
+      const res = await fetch(`/api/chapters/${id}/stitch`, { method: 'POST' });
+      if (!res.ok) {
+        const err = (await res.json()).error ?? 'Birleştirilemedi';
+        setGenState((s) => ({ ...s, err }));
+      }
+      refreshTree(); load();
+    } finally { setStitchBusy(false); }
+  }
+
+  async function loadScriptJson() {
+    setScriptErr('');
+    const res = await fetch(`/api/chapters/${id}/script`);
+    if (res.ok) setScriptJson(JSON.stringify(await res.json(), null, 2));
+    else setScriptErr('Script yüklenemedi');
+  }
+
+  async function saveSegmentEdit() {
+    if (!editSeg) return;
+    const res = await fetch(`/api/segments/${editSeg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: editSeg.text, style: editSeg.style.trim() ? editSeg.style : null }),
+    });
+    if (!res.ok) {
+      const err = (await res.json()).error ?? 'Segment kaydedilemedi';
+      setGenState((s) => ({ ...s, err }));
+    } else setEditSeg(null);
+    refreshTree(); load(); loadPreflight();
+  }
+
   if (!detail) return <p className="muted">Yükleniyor…</p>;
   const { chapter, script, cast, segments, renders } = detail;
   // Havuz aktif sağlayıcıdan gelir; mevcut ses havuzda değilse (ör. sağlayıcı değişti) tek başına eklenir.
@@ -273,8 +307,11 @@ export default function ChapterPage() {
         )}
 
         <details>
-          <summary>Elle JSON yapıştır (gelişmiş)</summary>
-          <p><textarea value={scriptJson} onChange={(e) => setScriptJson(e.target.value)} placeholder="JSON script’i buraya yapıştır" /></p>
+          <summary>Script JSON (görüntüle / düzenle / elle yapıştır)</summary>
+          <p className="row">
+            {script && <button className="ghost" onClick={loadScriptJson}><Icon name="doc" /> Mevcut JSON’u getir</button>}
+          </p>
+          <p><textarea value={scriptJson} onChange={(e) => setScriptJson(e.target.value)} placeholder="JSON script’i buraya yapıştır (kaydet = yeni versiyon)" /></p>
           <button className="ghost" onClick={saveScript} disabled={!scriptJson.trim()}>Script kaydet</button>
         </details>
         {scriptErr && <p className="err">{scriptErr}</p>}
@@ -322,6 +359,19 @@ export default function ChapterPage() {
           </p>
         )}
         {genState.err && <p className="err">{genState.err}</p>}
+        <p className="row">
+          <button onClick={stitch} disabled={stitchBusy || genState.busy || annState.busy || regenBusy !== null || !['voiced', 'done'].includes(chapter.status)}>
+            {stitchBusy ? <Icon name="spinner" /> : <Icon name="doc" />} Birleştir (mp3)
+          </button>
+          {chapter.status === 'voiced' && (
+            <span className="muted">
+              {renders.length > 0 ? 'Segmentler değişti — son mp3 güncel değil.' : 'Segmentler hazır — dinlemek için birleştir.'}
+            </span>
+          )}
+          {chapter.status === 'voiced' && segments.some((s) => s.status === 'failed') && (
+            <span className="muted"><Icon name="warn" size={12} /> {segments.filter((s) => s.status === 'failed').length} segment başarısız — birleştirme yalnız üretilenleri içerir.</span>
+          )}
+        </p>
         {renders.map((r) => (
           <p key={r.id} className="player">
             <audio controls src={`/api/audio/${r.path}`} />
@@ -341,13 +391,27 @@ export default function ChapterPage() {
                   <td className="mono">{s.idx + 1}</td>
                   <td>{s.speaker}</td>
                   <td className="muted">{s.style ?? ''}</td>
-                  <td className="mono">{s.text.length > 80 ? s.text.slice(0, 80) + '…' : s.text}</td>
+                  <td className="mono">
+                    {editSeg?.id === s.id ? (
+                      <span className="rows">
+                        <textarea value={editSeg.text} onChange={(e) => setEditSeg({ ...editSeg, text: e.target.value })} rows={3} />
+                        <input value={editSeg.style} onChange={(e) => setEditSeg({ ...editSeg, style: e.target.value })} placeholder="stil (boş = stilsiz)" />
+                        <span className="row">
+                          <button className="ghost" onClick={saveSegmentEdit} disabled={!editSeg.text.trim()}>Kaydet</button>
+                          <button className="ghost" onClick={() => setEditSeg(null)}>Vazgeç</button>
+                        </span>
+                      </span>
+                    ) : (
+                      s.text.length > 80 ? s.text.slice(0, 80) + '…' : s.text
+                    )}
+                  </td>
                   <td>
                     <span className="row" style={{ gap: '0.3rem', flexWrap: 'nowrap' }}>
                       <span className={`badge ${s.status}`}>{s.status}</span>
                       {s.audioPath && (
                         <button className="icon" onClick={() => setPlayingSeg(playingSeg === s.id ? null : s.id)} aria-label="Segmenti dinle" title="Segmenti dinle"><Icon name="play" size={13} /></button>
                       )}
+                      <button className="icon" onClick={() => setEditSeg({ id: s.id, text: s.text, style: s.style ?? '' })} disabled={genState.busy || annState.busy || regenBusy !== null} aria-label="Segmenti düzenle" title="Segmenti düzenle"><Icon name="pencil" size={13} /></button>
                       <button className="icon" onClick={() => regenerate(s.id)} disabled={genState.busy || annState.busy || regenBusy !== null} aria-label="Yeniden üret (1 çağrı)" title="Yeniden üret (1 çağrı)">
                         {regenBusy === s.id ? <Icon name="spinner" size={13} /> : <Icon name="wave" size={13} />}
                       </button>

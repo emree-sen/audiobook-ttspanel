@@ -5,14 +5,14 @@ import type { Db } from '../db/client';
 import { audioCache, jobs, renders, segments } from '../db/schema';
 import { newId } from '../id';
 import { audioDir } from '../config';
-import { updateChapter } from './chapters';
+import { getChapter, updateChapter } from './chapters';
 import { latestScript, listSegments } from './scripts';
 import { activeProvider, recordCall, remainingToday } from './quota';
 import { planChapter } from './preflight';
 import { adapterFromSettings } from './generation';
 import { parseVoiceId } from '@/src/core/voices';
 import { concatSegmentsToWav, wavToMp3 } from '@/src/core/audio/stitch';
-import type { TtsAdapter } from '@/src/core/types';
+import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '@/src/core/types';
 
 export type JobRow = typeof jobs.$inferSelect;
 
@@ -66,6 +66,19 @@ export async function stitchChapter(db: Db, chapterId: string, scriptId: string)
   return { renderId, renderPath: relPath, durationSec: totalMs / 1000 };
 }
 
+// Birleştirme artık bilinçli bir adım: en güncel script'in done segmentlerinden mp3 üretir.
+export async function stitchLatest(db: Db, chapterId: string): Promise<{ renderId: string; renderPath: string; durationSec: number }> {
+  const scr = latestScript(db, chapterId);
+  if (!scr) throw new Error('Bölümün script’i yok — önce script üretin');
+  const active = db.select().from(jobs)
+    .where(and(eq(jobs.chapterId, chapterId), inArray(jobs.status, ['queued', 'running']))).get();
+  if (active) throw new Error('Bölümde aktif bir üretim işi var — bitmesini bekleyin');
+  if (!listSegments(db, scr.id).some((s) => s.status === 'done')) throw new Error('Birleştirilecek üretilmiş segment yok');
+  const st = await stitchChapter(db, chapterId, scr.id);
+  updateChapter(db, chapterId, { status: 'done' });
+  return st;
+}
+
 // Segment kaydet + cache satırı + segment durumu (tek yerde).
 async function saveSegmentAudio(db: Db, segmentRowId: string, hash: string, audio: Buffer, durationMs: number, usd: number): Promise<void> {
   const rel = `segments/${hash}.wav`;
@@ -77,10 +90,27 @@ async function saveSegmentAudio(db: Db, segmentRowId: string, hash: string, audi
     .where(eq(segments.id, segmentRowId)).run();
 }
 
+// KN1: preview TTS bazen metni tekrarlayıp uzun sessizlik üretir (saha: 34 karakter → 14 sn).
+// Süre, makul tavanı aşarsa 1 kez yeniden dener ve KISA sonucu kullanır. attempts, defter
+// dürüstlüğü için döner (her deneme gerçek bir API çağrısıdır). Deneme patlarsa ilk sonuç kalır.
+export const DURATION_GUARD_MS_PER_CHAR = 250;
+export const DURATION_GUARD_MIN_MS = 4000;
+export async function synthesizeChecked(adapter: TtsAdapter, req: TtsSegmentRequest): Promise<{ result: TtsResult; attempts: number }> {
+  const maxMs = Math.max(DURATION_GUARD_MIN_MS, req.text.length * DURATION_GUARD_MS_PER_CHAR);
+  const first = await adapter.synthesize(req);
+  if (first.durationMs <= maxMs) return { result: first, attempts: 1 };
+  let second: TtsResult | undefined;
+  try { second = await adapter.synthesize(req); } catch { /* bekçi denemesi patladı — ilk sonuç kullanılır */ }
+  return { result: second && second.durationMs < first.durationMs ? second : first, attempts: 2 };
+}
+
 export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promise<void> {
-  const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get();
-  if (!job || (job.status !== 'queued' && job.status !== 'running')) return;
-  setJob(db, job.id, { status: 'running', pausedReason: null });
+  // KN2: işi atomik sahiplen — aynı queued işi ikinci bir worker alamaz (dev'de rota-başına
+  // modül örneği ensureWorker tekilliğini kırabiliyordu; kota 2x yanıyordu).
+  const claimed = db.update(jobs).set({ status: 'running', pausedReason: null, updatedAt: Date.now() })
+    .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued'))).run();
+  if (claimed.changes === 0) return;
+  const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get()!;
   const { name: provider, model } = activeProvider(db);
   try {
     const { script, plan } = planChapter(db, job.chapterId, job.scriptId);
@@ -110,12 +140,14 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
         return;
       }
       try {
-        const res = await adapter.synthesize({
+        const { result: res, attempts } = await synthesizeChecked(adapter, {
           text: item.text, voice: parseVoiceId(item.voiceId), language: script.language,
           style: item.style, tags: item.tags, pronunciations: script.pronunciations,
         });
-        callsUsed++;
-        recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: res.cost.usd ?? 0 });
+        callsUsed += attempts;
+        // Her deneme deftere yazılır; usd yalnız kullanılan sonuca (bekçi denemesi 0 ile kaydedilir).
+        for (let a = 0; a < attempts; a++)
+          recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: a === attempts - 1 ? res.cost.usd ?? 0 : 0 });
         await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
         setJob(db, job.id, { callsUsed, doneCount: ++doneCount });
       } catch (e) {
@@ -126,9 +158,9 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
         setJob(db, job.id, { callsUsed });
       }
     }
-    await stitchChapter(db, job.chapterId, job.scriptId);
+    if (listSegments(db, job.scriptId).every((r) => r.status !== 'done')) throw new Error('Hiç segment üretilemedi');
     setJob(db, job.id, { status: 'done', doneCount });
-    updateChapter(db, job.chapterId, { status: 'done' });
+    updateChapter(db, job.chapterId, { status: 'voiced' });
   } catch (e) {
     setJob(db, job.id, { status: 'error', error: e instanceof Error ? e.message : String(e) });
     updateChapter(db, job.chapterId, { status: 'error' });
@@ -150,12 +182,12 @@ export function recoverJobs(db: Db): void {
 }
 
 // Süreç-içi tek worker: kuyruktaki (duraklamamış) işleri sırayla yürütür.
-// Zaten çalışıyorsa AYNI koşunun promise'ini döndürür — await eden, sürmekte olan koşuya katılır
-// (testlerde deterministik bekleme; rotalarda void ile ateşle-unut).
-let workerPromise: Promise<void> | null = null;
+// globalThis çapası: Next dev'de her rota ayrı modül örneği yükleyebilir; modül-global
+// tekilliği bu yüzden yetmez (KN2). Zaten çalışıyorsa AYNI koşunun promise'ine katılır.
+const G = globalThis as unknown as { __wntWorker?: Promise<void> | null };
 export function ensureWorker(db: Db): Promise<void> {
-  if (workerPromise) return workerPromise;
-  workerPromise = (async () => {
+  if (G.__wntWorker) return G.__wntWorker;
+  G.__wntWorker = (async () => {
     await Promise.resolve(); // dış atama tamamlanmadan iç mantık başlamasın — yoksa kuyrukta iş bulunamayınca
     // (hiç await'e uğramadan) fonksiyon senkron biter; finally'deki sıfırlama, dıştaki atamadan ÖNCE
     // çalışıp hemen ezilir ve workerPromise sonsuza dek "ölü" bir promise'e saplanır (bir sonraki
@@ -170,14 +202,14 @@ export function ensureWorker(db: Db): Promise<void> {
         await runJob(db, next.id, adapterFromSettings(db));
       }
     } finally {
-      workerPromise = null;
+      G.__wntWorker = null;
     }
   })();
-  return workerPromise;
+  return G.__wntWorker;
 }
 
-// Tek segmenti yeniden üretir (cache'i üzerine yazar) ve bölümü yeniden birleştirir.
-export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsAdapter): Promise<{ renderId: string; renderPath: string }> {
+// Tek segmenti yeniden üretir (cache'i üzerine yazar). Birleştirme ayrı bir adımdır (stitchLatest).
+export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsAdapter): Promise<{ segmentId: string; status: string }> {
   const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
   if (!row) throw new Error('Segment bulunamadı');
   const active = db.select().from(jobs)
@@ -189,16 +221,18 @@ export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsA
   const { script, plan } = planChapter(db, row.chapterId, row.scriptId);
   const item = plan[row.idx];
   try {
-    const res = await adapter.synthesize({
+    const { result: res, attempts } = await synthesizeChecked(adapter, {
       text: item.text, voice: parseVoiceId(item.voiceId), language: script.language,
       style: item.style, tags: item.tags, pronunciations: script.pronunciations,
     });
-    recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: res.cost.usd ?? 0 });
+    for (let a = 0; a < attempts; a++)
+      recordCall(db, { provider, model, segmentId: row.id, ok: true, usd: a === attempts - 1 ? res.cost.usd ?? 0 : 0 });
     await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
   } catch (e) {
     recordCall(db, { provider, model, segmentId: row.id, ok: false });
     throw new Error(`Segment üretilemedi: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const st = await stitchChapter(db, row.chapterId, row.scriptId);
-  return { renderId: st.renderId, renderPath: st.renderPath };
+  // Birleştirme kullanıcının elinde; mevcut mp3 bayatladıysa bölüm voiced'a döner.
+  if (getChapter(db, row.chapterId)?.status === 'done') updateChapter(db, row.chapterId, { status: 'voiced' });
+  return { segmentId: row.id, status: 'done' };
 }

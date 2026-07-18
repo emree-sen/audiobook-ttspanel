@@ -41,6 +41,29 @@ export function chunkText(raw: string, target = CHUNK_TARGET): string[] {
   return chunks;
 }
 
+export const MERGE_MAX_CHARS = 700;
+
+// Ardışık segmentleri birleştirir (aynı speaker + aynı stil, arada pause yok, tavan aşılmıyor).
+// Segment = 1 TTS çağrısı: birleşme doğrudan kota tasarrufudur (saha bulgusu A, spec §1.2).
+export function mergeSegments<T extends { speaker: string; type: string; text: string; style?: string; pause_after_ms?: number }>(
+  segs: T[], maxLen = MERGE_MAX_CHARS,
+): T[] {
+  const out: T[] = [];
+  for (const s of segs) {
+    const prev = out[out.length - 1];
+    if (
+      prev && prev.speaker === s.speaker && (prev.style ?? '') === (s.style ?? '') &&
+      prev.pause_after_ms == null && prev.text.length + 1 + s.text.length <= maxLen
+    ) {
+      prev.text = `${prev.text} ${s.text}`;
+      prev.pause_after_ms = s.pause_after_ms; // son parçanınki; type ilk parçanınki (değişmez)
+      continue;
+    }
+    out.push({ ...s });
+  }
+  return out;
+}
+
 // Tek chunk: LLM çağrısı + zod doğrulama; hatada 1 retry (hata özeti sistem prompt'a eklenir).
 async function annotateChunk(adapter: LlmAdapter, system: string, user: string): Promise<{ chunk: LlmChunk; usage: { inputTokens: number; outputTokens: number } }> {
   let lastErr = '';
@@ -113,12 +136,12 @@ export async function annotateChapter(
       : []),
   ];
   const castIds = new Set(cast.map((c) => c.character_id));
-  const segs = allSegments.map((s, i) => ({
-    id: `s${i + 1}`,
+  const normalized = allSegments.map((s) => ({
     // narrator modunda veya cast dışı konuşmacıda anlatıcıya düşür (dayanıklılık).
     speaker: voiceMode === 'narrator' || !castIds.has(s.speaker) ? 'narrator' : s.speaker,
     type: s.type, text: s.text, style: s.style, pause_after_ms: s.pause_after_ms,
   }));
+  const segs = mergeSegments(normalized).map((s, i) => ({ id: `s${i + 1}`, ...s }));
   const script = {
     schema_version: '1.0', series: chapter.title, season: 1, episode: chapter.position,
     title: chapter.title, language: 'tr-TR', cast, segments: segs,

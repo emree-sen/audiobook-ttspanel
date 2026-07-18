@@ -1,6 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { scripts, segments } from '../db/schema';
+import { jobs, scripts, segments } from '../db/schema';
 import { newId } from '../id';
 import { updateChapter } from './chapters';
 import { parseScript } from '@/src/core/schema';
@@ -47,6 +47,26 @@ export function changeCastVoice(db: Db, chapterId: string, characterId: string, 
   if (!member) throw new Error(`Karakter bulunamadı: "${characterId}"`);
   member.voice_id = voiceId;
   const saved = saveScript(db, chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);
+  return { scriptId: saved.scriptId, version: saved.version };
+}
+
+// En güncel scriptte TEK segmentin metnini/stilini değiştirip yeni versiyon yazar (LLM/TTS çağrısı yok).
+// Hash değişir → üretimde yalnız bu segment yeni çağrı olur; kalanlar cache'ten (C1).
+export function editSegment(db: Db, segmentId: string, patch: { text?: string; style?: string | null }): { scriptId: string; version: number } {
+  const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
+  if (!row) throw new Error('Segment bulunamadı');
+  const active = db.select().from(jobs)
+    .where(and(eq(jobs.chapterId, row.chapterId), inArray(jobs.status, ['queued', 'running']))).get();
+  if (active) throw new Error('Bölümde aktif bir üretim işi var — düzenlemeden önce bitmesini bekleyin veya duraklatılmışsa iptal edin');
+  const scr = latestScript(db, row.chapterId);
+  if (!scr || scr.id !== row.scriptId) throw new Error('Segment güncel script’e ait değil — sayfayı yenileyin');
+  if (patch.text !== undefined && !patch.text.trim()) throw new Error('Segment metni boş olamaz');
+  const json = JSON.parse(scr.json) as { segments: { text: string; style?: string }[] };
+  const seg = json.segments[row.idx];
+  if (!seg) throw new Error('Segment script içinde bulunamadı');
+  if (patch.text !== undefined) seg.text = patch.text.trim();
+  if (patch.style !== undefined) { if (patch.style?.trim()) seg.style = patch.style.trim(); else delete seg.style; }
+  const saved = saveScript(db, row.chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);
   return { scriptId: saved.scriptId, version: saved.version };
 }
 

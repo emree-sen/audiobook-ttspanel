@@ -1,6 +1,5 @@
 import { getDb } from '@/lib/db/client';
 import { ensureWorker, latestJob } from '@/lib/services/producer';
-import { listRenders } from '@/lib/services/generation';
 import { listSegments } from '@/lib/services/scripts';
 
 export const dynamic = 'force-dynamic';
@@ -27,9 +26,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           continue;
         }
         if (job.status === 'done') {
-          const render = listRenders(db, id)[0];
           const failedCount = listSegments(db, job.scriptId).filter((s) => s.status === 'failed').length;
-          send('done', { ...base, renderId: render?.id, renderPath: render?.path, failedCount });
+          send('done', { ...base, failedCount });
         } else if (job.status === 'queued') {
           send('paused', { ...base, reason: job.pausedReason });
         } else {

@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createDb } from '@/lib/db/client';
 import { audioDir } from '@/lib/config';
-import { jobs, ttsCalls } from '@/lib/db/schema';
+import { jobs, renders, ttsCalls } from '@/lib/db/schema';
 import { createProject } from '@/lib/services/projects';
 import { createChapter, getChapter } from '@/lib/services/chapters';
 import { importScript, latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
 import { listRenders } from '@/lib/services/generation';
-import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob } from '@/lib/services/producer';
+import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob, stitchLatest, synthesizeChecked } from '@/lib/services/producer';
 import { MockAdapter } from '@/src/core/tts/mock';
 import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '@/src/core/types';
 
@@ -46,7 +46,7 @@ describe('enqueueJob', () => {
 });
 
 describe('runJob', () => {
-  test('tam üretim: segment dosyaları + cache + render + job/chapter done', async () => {
+  test('tam üretim: segment dosyaları + cache + job done, bölüm voiced (render YOK)', async () => {
     const { db, chapterId } = setup();
     const job = enqueueJob(db, chapterId);
     await runJob(db, job.id, new MockAdapter());
@@ -56,8 +56,16 @@ describe('runJob', () => {
     const segs = listSegments(db, latestScript(db, chapterId)!.id);
     expect(segs.every((s) => s.status === 'done' && s.audioPath?.startsWith('segments/') && s.contentHash)).toBe(true);
     expect(existsSync(join(audioDir(), segs[0].audioPath!))).toBe(true);
-    expect(listRenders(db, chapterId)).toHaveLength(1);
-    expect(getChapter(db, chapterId)?.status).toBe('done');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+  });
+
+  test('runJob sonunda render YOK; bölüm voiced olur', async () => {
+    const { db, chapterId } = setup();
+    const job = enqueueJob(db, chapterId);
+    await runJob(db, job.id, new MockAdapter());
+    expect(db.select().from(renders).all()).toHaveLength(0);
+    expect(getChapter(db, chapterId)!.status).toBe('voiced');
   });
 
   test('ikinci üretim tamamen cache\'ten: 0 yeni çağrı', async () => {
@@ -67,7 +75,8 @@ describe('runJob', () => {
     await runJob(db, enqueueJob(db, chapterId).id, new MockAdapter());
     expect(callCount(db)).toBe(before);
     expect(latestJob(db, chapterId)!.status).toBe('done');
-    expect(listRenders(db, chapterId)).toHaveLength(2);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
   });
 
   test('limitCalls: tavana gelince duraklar; resume limitsiz tamamlar', async () => {
@@ -92,7 +101,7 @@ describe('runJob', () => {
     expect(j).toMatchObject({ status: 'queued', pausedReason: 'quota', doneCount: 3 });
   });
 
-  test('segment hatası: failed + iş sürer + render oluşur', async () => {
+  test('segment hatası: failed + iş sürer + job done, bölüm voiced (render oluşturulmaz)', async () => {
     const { db, chapterId } = setup();
     const inner = new MockAdapter();
     let n = 0;
@@ -108,7 +117,8 @@ describe('runJob', () => {
     expect(segs.filter((s) => s.status === 'failed')).toHaveLength(1);
     expect(segs[1].error).toMatch(/kota doldu/);
     expect(latestJob(db, chapterId)!.status).toBe('done');
-    expect(listRenders(db, chapterId)).toHaveLength(1);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
     expect(callCount(db)).toBe(5); // başarısız da defterde
   });
 
@@ -149,6 +159,38 @@ describe('runJob', () => {
     await runJob(db, job.id, cancelling);
     expect(db.select().from(jobs).where(eq(jobs.id, job.id)).get()?.status).toBe('canceled');
     expect(n).toBeLessThanOrEqual(2); // iptalden sonra çağrı yok
+  });
+
+  test('aynı işe eşzamanlı iki runJob: yalnız biri sahiplenir, çağrı sayısı segment sayısını aşmaz', async () => {
+    const { db, chapterId } = setup(); // mevcut yardımcı; script 5 segmentli fixture
+    let calls = 0;
+    const spy = { id: 'mock', async synthesize(req: TtsSegmentRequest) { calls++; return new MockAdapter().synthesize(req); } };
+    const job = enqueueJob(db, chapterId);
+    await Promise.all([runJob(db, job.id, spy), runJob(db, job.id, spy)]);
+    expect(calls).toBe(5); // çift worker olsaydı 10'a çıkardı (KN2 saha bulgusu)
+    const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get()!;
+    expect(fresh.status).toBe('done');
+  });
+});
+
+describe('stitchLatest', () => {
+  test('done segmentlerden render üretir; bölüm done olur', async () => {
+    const { db, chapterId } = setup();
+    const job = enqueueJob(db, chapterId);
+    await runJob(db, job.id, new MockAdapter());
+    const st = await stitchLatest(db, chapterId);
+    expect(st.renderId).toMatch(/^rnd_/);
+    expect(db.select().from(renders).all()).toHaveLength(1);
+    expect(getChapter(db, chapterId)!.status).toBe('done');
+  });
+  test('aktif iş varken Türkçe hata', async () => {
+    const { db, chapterId } = setup();
+    enqueueJob(db, chapterId); // queued bırak
+    await expect(stitchLatest(db, chapterId)).rejects.toThrow(/aktif bir üretim işi/);
+  });
+  test('hiç done segment yoksa Türkçe hata', async () => {
+    const { db, chapterId } = setup(); // script var, üretim yok
+    await expect(stitchLatest(db, chapterId)).rejects.toThrow(/üretilmiş segment yok/);
   });
 });
 
@@ -203,4 +245,59 @@ describe('recover + worker', () => {
     await ensureWorker(db); // tekrar çağrı — hâlâ duraklı kalmalı
     expect(latestJob(db, chapterId)!.doneCount).toBe(1);
   });
+});
+
+describe('synthesizeChecked (KN1 süre bekçisi)', () => {
+  const req = { text: 'Kısa bir cümle.', voice: { provider: 'mock', providerVoice: 'x' }, language: 'tr-TR' };
+  const fake = (durations: number[], failFrom = Infinity): TtsAdapter => {
+    let i = 0;
+    return { id: 'fake', async synthesize() {
+      if (i >= failFrom) { i++; throw new Error('deneme patladı'); }
+      const d = durations[Math.min(i++, durations.length - 1)];
+      return { audio: Buffer.alloc(4), format: 'wav' as const, durationMs: d, cost: { unit: 'chars' as const, amount: 5, usd: 0 } };
+    } };
+  };
+  test('makul süre: tek deneme', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([2000]), req);
+    expect(attempts).toBe(1);
+    expect(result.durationMs).toBe(2000);
+  });
+  test('absürt süre: 1 yeniden deneme, kısa sonuç seçilir', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000, 2200]), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(2200);
+  });
+  test('iki deneme de absürtse kısa olan kullanılır', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000, 20000]), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(14000);
+  });
+  test('yeniden deneme patlarsa ilk sonuç kullanılır (başarı bozulmaz)', async () => {
+    const { result, attempts } = await synthesizeChecked(fake([14000], 1), req);
+    expect(attempts).toBe(2);
+    expect(result.durationMs).toBe(14000);
+  });
+  test('eşik: max(4000, uzunluk*250)', async () => {
+    // 15 karakter → tavan 4000 (taban); 4000 üstü tetikler, altı tetiklemez
+    const { attempts } = await synthesizeChecked(fake([3900]), req);
+    expect(attempts).toBe(1);
+  });
+});
+
+test('runJob bekçi denemelerini deftere yazar (attempts kadar kayıt + callsUsed)', async () => {
+  const { db, chapterId } = setup();
+  setSetting(db, 'provider', 'mock');
+  // ilk segmentte absürt, sonra normal süre veren adapter
+  let n = 0;
+  const spy: TtsAdapter = { id: 'mock', async synthesize(req) {
+    const base = await new MockAdapter().synthesize(req);
+    n++;
+    return n === 1 ? { ...base, durationMs: 999999 } : base;
+  } };
+  const job = enqueueJob(db, chapterId);
+  await runJob(db, job.id, spy);
+  const calls = db.select().from(ttsCalls).all();
+  expect(calls.length).toBe(6); // 5 segment + 1 bekçi denemesi
+  const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get()!;
+  expect(fresh.callsUsed).toBe(6);
 });
