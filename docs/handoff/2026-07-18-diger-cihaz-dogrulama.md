@@ -75,3 +75,7 @@ Kullanıcı **en son render'da da tekrarın sürdüğünü** doğruladı → H2 
 ### Ana makine için öneri (karar kullanıcıda)
 
 - ~~Chunk-dedup savunması~~ gereksiz (H1 çürük). Yerine C3 kapsamına aday: **(a)** adapter'a süre makullük bekçisi (ses süresi ≈ karakter/hız beklentisinin ~2,5 katını aşarsa yeniden dene; N denemede düzelmezse işaretle), **(b)** worker tekilliğini `globalThis` + DB-seviyesi iş kilidiyle sağlamlaştırma, **(c)** zaten planlı mergeSegments (uzun segmentler bu model arızasını da seyreltiyor).
+
+## Kapanış (ana makine, 2026-07-18)
+
+Bulgular incelendi, kullanıcı onayıyla her iki öneri de C3 kapsamına alındı (spec §3.5 süre bekçisi, §3.6 worker tekilliği); chunk-dedup kalıcı kapsam dışı. Bu doğrulama görevi KAPANDI — diğer cihazda başka işlem gerekmiyor.

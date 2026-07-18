@@ -9,7 +9,7 @@
 |---|---|---|
 | A. Tek anlatıcıda aşırı segmentleme + kişi-ağzından stiller | `prompt.ts` her modda "1-3 cümle" + narrator modunda "style ile belirt" talimatı — LLM söyleneni yapıyor; segment = 1 TTS çağrısı → kota düşmanı | Prompt (narrator'a özel kural) **+** kod tarafı deterministik birleştirme |
 | B. Stil direktifinin sese okunması | Gemini TTS'te ayrı talimat kanalı yok; direktif + metin aynı prompt'ta, preview bazen direktifi okuyor; otomatik tespit imkânsız | **Düzenlenebilirlik**: script JSON düzenleme + segment satır içi düzenleme (elle müdahale) |
-| C. Son üründe sıra karışması / tekrarlar | Birleştirici deterministik (ORDER BY idx) — temize çıktı. Şüpheli: LLM chunk sınırı tekrarları VEYA eski render dinlenmesi | Diğer cihazda kanıt doğrulaması (bkz. `docs/handoff/2026-07-18-diger-cihaz-dogrulama.md`); kanıt çıkarsa chunk-tekrar savunması AYRI iş |
+| C. Son üründe sıra karışması / tekrarlar | **Doğrulandı (diğer cihaz, 2026-07-18):** script ve birleştirici temiz; iki gerçek kök neden: **KN1** TTS modeli bazı stilli kısa segmentlerde metni tekrarlayıp uzun sessizlik üretiyor (34 kr → 14 sn); **KN2** Next dev'de rota-başına modül örneği `ensureWorker` tekilliğini kırıyor → aynı iş 2 worker'da, kota 2x + çift render (bkz. handoff dosyası "Bulgular 2") | **KN1** süre bekçisi (§3.5) + **KN2** worker tekilliği sağlamlaştırma (§3.6); chunk-dedup KALICI kapsam dışı (H1 çürüdü) |
 | D. Her segment yenilemede otomatik yeniden birleştirme | C1 tasarımı (regen → stitch → yeni render) | **Ayrı "Birleştir" adımı**; regen yalnız segment dosyasını değiştirir |
 
 ## 1. A — Segmentleme (annotation)
@@ -48,9 +48,24 @@ Script kartına "Düzenle" eylemi: mevcut script JSON'u (en güncel versiyon) te
 - **Bayat mp3 kuralı:** bölüm `done` iken bir segment yenilenir/değişirse durum `voiced`'a döner (mevcut render'lar listede kalır ama rozet "birleştirme güncel değil" mesajı verir — kullanıcı Birleştir'e basınca tazelenir). `editSegment` zaten `saveScript` üzerinden `scripted`'a düşürür (mevcut davranış, korunur).
 - **Progress SSE sözleşme değişikliği:** `done` olayı artık `renderId` taşımaz (`{ doneCount, failedCount }`); UI "Üretim bitti — dinlemek için Birleştir" durumuna geçer.
 
-## 4. C — kanıt bekleyen iş (bu spec'e girmez)
+### 3.5 KN1 — Süre bekçisi (bozuk TTS çıktısını yakala)
 
-Sıra/tekrar şikâyeti diğer cihazda doğrulanacak (`docs/handoff/2026-07-18-diger-cihaz-dogrulama.md`). Script İÇİNDE chunk-sınırı tekrarı kanıtlanırsa ayrı bir karar olarak "ardışık chunk'larda birebir aynı metinli segmentleri düşürme" savunması eklenir. §1.2 post-merge zaten ardışık birebir tekrarların bir kısmını emecek (aynı speaker+stil ise tek segmente iner — metin yine iki kez okunur; gerçek çözüm dedup'tır, kanıt bekler).
+Panel katmanında (core DEĞİŞMEZ) ortak yardımcı: `synthesizeChecked(adapter, req)` (`lib/services/producer.ts`):
+- Beklenen tavan: `maxMs = Math.max(4000, req.text.length * 250)` (≈ normal hızın ~2,5 katı; kısa metinlerde 4 sn taban).
+- `res.durationMs > maxMs` ise **1 kez** yeniden dener; iki sonuçtan **kısa süreli olanı** kullanır (kısa = makul; ikisi de "başarılı" sayılır).
+- Her gerçek deneme deftere yazılır (`recordCall`) — kota sayımı dürüst kalır; bekçi tetiklenen segment başına en fazla +1 çağrı.
+- `runJob` ve `regenerateSegment` synthesize çağrılarını bu yardımcıya taşır. Mock/piper/openai için de zararsız (eşik cömert; mock hızıyla asla tetiklenmez).
+
+### 3.6 KN2 — Worker tekilliği sağlamlaştırma (kota 2x bug'ı)
+
+İki katman:
+1. **Süreç içi:** `workerPromise` modül-global'i `globalThis.__wntWorker`'a taşınır — Next dev'de rota başına ayrı modül örneği oluşsa da tek promise paylaşılır.
+2. **DB katmanı (kesin sigorta):** `runJob` işi **atomik sahiplenir**: `UPDATE jobs SET status='running' WHERE id=? AND status='queued'` — etkilenen satır 0 ise başka worker almış demektir, sessizce çıkılır. (Mevcut koşulsuz `setJob(running)` kalkar; `running` durumundaki işe ikinci giriş de engellenmiş olur.)
+- Test: aynı işe eşzamanlı iki `runJob` → toplam synthesize çağrısı segment sayısını aşmaz, tek render seti.
+
+## 4. C — kanıt kapandı
+
+Diğer cihaz doğrulaması tamamlandı (handoff dosyası "Bulgular" + "Bulgular 2"): H1 (chunk tekrarı) ve H2 (eski render) çürüdü; kök nedenler KN1/KN2 olarak yukarıda kapsama alındı. Chunk-dedup savunması KALICI olarak kapsam dışı. §1.2 post-merge, KN1'in görülme sıklığını da düşürür (sorun stilli KISA segmentlerde gözlendi; birleşik segmentler daha uzun).
 
 ## 5. Test stratejisi
 
@@ -58,6 +73,8 @@ Sıra/tekrar şikâyeti diğer cihazda doğrulanacak (`docs/handoff/2026-07-18-d
 - Prompt: narrator modunda yeni kurallar sistem prompt'unda; mock marker metinleri değişmedi (mevcut mock mod-algı testleri yeşil kalır).
 - `editSegment`: yeni versiyon, yalnız hedef segment değişir, eski-versiyon segment id'sine Türkçe hata; hash değişimi → preflight newCalls=1 (kalanlar cache).
 - Producer/D: runJob sonunda render YOK + chapter `voiced`; stitch endpoint render üretir + `done`; regen stitch yapmaz; SSE `done` olayı yeni şema.
+- KN1: `synthesizeChecked` — normal süre → tek çağrı; absürt süre → retry + kısa sonuç seçimi + 2 defter kaydı (sahte adapter ile süre kurgulanır).
+- KN2: eşzamanlı iki `runJob` aynı işte → atomik sahiplenme tek worker'a verir (çağrı sayısı = segment sayısı); `globalThis` çapası birim düzeyde doğrulanır.
 - Mevcut 166 test: stitch/regen/status sözleşmesi değişen testler güncellenir (davranış sözleşmesi bilinçli değişiyor — C1 spec'inden sapma bu spec'le belgelenmiş sayılır).
 
 ## 6. Riskler / notlar
@@ -69,4 +86,4 @@ Sıra/tekrar şikâyeti diğer cihazda doğrulanacak (`docs/handoff/2026-07-18-d
 
 ## 7. Kapsam dışı
 
-Chunk-tekrar dedup savunması (kanıt sonrası ayrı karar) · segment satırından ekle/sil/birleştir · renders temizliği/GC · stil kaçağının otomatik tespiti · CLI davranışı (eski akış aynen).
+Chunk-tekrar dedup savunması (H1 çürüdü — kalıcı) · segment satırından ekle/sil/birleştir · renders temizliği/GC · stil kaçağının otomatik tespiti · CLI davranışı (eski akış aynen; süre bekçisi panel katmanında olduğundan CLI etkilenmez).
