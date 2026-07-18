@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '../types.js';
+import type { TtsAdapter, TtsCapabilities, TtsResult, TtsSegmentRequest } from '../types.js';
 import { pcmToWav } from '../audio/wav.js';
 import { audioTokensToMs, computeGeminiCost } from '../cost.js';
 
@@ -17,6 +17,7 @@ export function buildPrompt(req: TtsSegmentRequest): string {
 export class GeminiAdapter implements TtsAdapter {
   readonly id: string;
   readonly model: string;
+  readonly capabilities: TtsCapabilities = { style: true };
   private ai: GoogleGenAI;
   private readonly minIntervalMs: number;
   private lastCallAt = 0;

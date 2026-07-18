@@ -19,4 +19,5 @@ export interface TtsSegmentRequest {
 }
 export interface TtsCost { unit: 'audio_tokens' | 'chars'; amount: number; usd?: number; }
 export interface TtsResult { audio: Buffer; format: 'wav' | 'mp3' | 'pcm'; durationMs: number; cost: TtsCost; }
-export interface TtsAdapter { readonly id: string; synthesize(req: TtsSegmentRequest): Promise<TtsResult>; }
+export interface TtsCapabilities { style: boolean }
+export interface TtsAdapter { readonly id: string; readonly capabilities?: TtsCapabilities; synthesize(req: TtsSegmentRequest): Promise<TtsResult>; }
