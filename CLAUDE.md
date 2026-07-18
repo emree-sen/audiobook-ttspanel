@@ -35,7 +35,10 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 - ✅ **UI Redesign — koyu stüdyo** (`docs/superpowers/specs/2026-07-17-panel-ui-redesign-design.md`): token sistemi, Manrope+JetBrains Mono (next/font), dalga-formu marka + eşitleyici animasyon, inline SVG ikonlar, ConfirmButton/EmptyState, 4 sayfa yeniden giydirildi. Davranış/API değişmedi.
 - ✅ **Dilim C1 — Üretim hattı** (`docs/superpowers/specs/2026-07-17-panel-slice-c1-production-line-design.md`, plan: `docs/superpowers/plans/2026-07-17-panel-slice-c1-production-line.md`): jobs/tts_calls/audio_cache tabloları, preflight çağrı+kota hesabı, DB-destekli kuyruk (duraklat/devam, restart toparlama), content-hash cache, segment dosyaları + tek-segment yeniden üretme, progress SSE izleyici.
 - ✅ **Dilim C2 — Sağlayıcı ekosistemi** (spec: docs/superpowers/specs/2026-07-17-panel-slice-c2-provider-ecosystem-design.md, plan: docs/superpowers/plans/2026-07-18-panel-slice-c2-provider-ecosystem.md): OpenAI-uyumlu adlandırılmış bağlantılar + Piper lokal adapter (kullanıcı kurulumlu), /settings ekranı (anahtarlar DB+env, maskeli), DB-tabanlı sağlayıcı-bazlı ses havuzu, yetenek bildirimi (stilsiz sağlayıcıda stil düşürme + not).
-- ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline. SONRAKİ.
+- ⬜ **Dilim C3 — Üretim akışı iyileştirmeleri** (spec onaylandı: `docs/superpowers/specs/2026-07-18-panel-slice-c3-production-flow-design.md`; 2026-07-18 saha testi bulguları): narrator modunda az-segment (prompt + mergeSegments), script JSON + segment satır düzenleme, ayrı "Birleştir" adımı (`voiced` durumu), regen artık otomatik stitch yapmaz. SONRAKİ.
+- ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline.
+
+> Açık doğrulama: son mp3'te sıra/tekrar şikâyeti diğer cihazda kanıt bekliyor — `docs/handoff/2026-07-18-diger-cihaz-dogrulama.md` (H1 çıkarsa C3'e chunk-dedup savunması eklenecek, kullanıcı kararıyla).
 
 ## Nasıl çalıştırılır
 
