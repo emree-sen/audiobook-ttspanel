@@ -70,7 +70,7 @@ describe('activeProvider', () => {
   test('bağlantı sağlayıcısında model bağlantıdan gelir; piper modeli boş', () => {
     createConnection(db, { id: 'sunucum', baseUrl: 'http://x/v1', model: 'kokoro' });
     setSetting(db, 'provider', 'sunucum');
-    expect(activeProvider(db)).toEqual({ name: 'sunucum', model: 'kokoro' });
+    expect(activeProvider(db)).toEqual({ name: 'sunucum', model: 'kokoro@http://x/v1' });
     setSetting(db, 'provider', 'piper');
     expect(activeProvider(db)).toEqual({ name: 'piper', model: '' });
   });

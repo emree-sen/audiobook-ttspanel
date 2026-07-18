@@ -6,6 +6,7 @@ import { createProject } from '@/lib/services/projects';
 import { createChapter } from '@/lib/services/chapters';
 import { importScript } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
+import { createConnection, deleteConnection } from '@/lib/services/connections';
 import { planChapter, preflightChapter, segmentHash } from '@/lib/services/preflight';
 import { supportsStyle } from '@/lib/services/generation';
 
@@ -53,6 +54,17 @@ describe('planChapter', () => {
     const c = createChapter(db, p.id, { title: 'B' });
     expect(() => planChapter(db, c.id)).toThrow(/script/i);
   });
+  test('bağlantı: aynı slug farklı baseUrl ile yeniden oluşturulursa hash değişir (eski cache sunulmaz)', () => {
+    const { db, chapterId } = setup();
+    createConnection(db, { id: 'sunucum', baseUrl: 'http://a/v1', model: 'kokoro' });
+    setSetting(db, 'provider', 'sunucum');
+    const before = planChapter(db, chapterId).plan.map((p) => p.hash);
+    deleteConnection(db, 'sunucum'); // provider ayarını da temizler
+    createConnection(db, { id: 'sunucum', baseUrl: 'http://b/v1', model: 'kokoro' });
+    setSetting(db, 'provider', 'sunucum'); // deleteConnection temizlediği için yeniden set
+    const after = planChapter(db, chapterId).plan.map((p) => p.hash);
+    expect(after.every((h, i) => h !== before[i])).toBe(true);
+  });
 });
 
 describe('preflightChapter', () => {
@@ -83,6 +95,20 @@ describe('preflightChapter', () => {
     const pf = preflightChapter(db, chapterId);
     expect(pf.quota).toBeNull();
     expect(pf.fits).toBe(true);
+  });
+  test('providerMismatch: script gemini sesli, aktif sağlayıcı piper → true', () => {
+    const { db, chapterId } = setup();
+    setSetting(db, 'provider', 'piper');
+    expect(preflightChapter(db, chapterId).providerMismatch).toBe(true);
+  });
+  test('providerMismatch: varsayılan sağlayıcı (gemini, fixture de gemini sesli) → false', () => {
+    const { db, chapterId } = setup();
+    expect(preflightChapter(db, chapterId).providerMismatch).toBe(false);
+  });
+  test('providerMismatch: mock sağlayıcı → her zaman false', () => {
+    const { db, chapterId } = setup();
+    setSetting(db, 'provider', 'mock');
+    expect(preflightChapter(db, chapterId).providerMismatch).toBe(false);
   });
 });
 

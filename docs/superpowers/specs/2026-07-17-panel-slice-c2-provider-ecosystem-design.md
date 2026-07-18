@@ -90,6 +90,7 @@ Sidebar'ın altına "Ayarlar" bağlantısı (dişli ikon). Sayfa kartları:
 - **Anahtar DB'de düz metin** durur (SQLite lokal, `data/` git-ignore; tek-sahip self-host varsayımı). Maskeli GET dışa sızdırmaz.
 - **`src/core` istisnası**: types.ts'e opsiyonel alan + Gemini/Mock'a birer satır `capabilities` — additive, mevcut 23 çekirdek test değişmeden yeşil kalmalı; başka core değişikliği YASAK.
 - Sağlayıcı değişince eski sağlayıcının segment durumları `done` görünür ama preflight yeni sağlayıcıya göre "yeni çağrı" sayar (hash farklı) — doğru davranış, kafa karışıklığını preflight satırı çözer.
+- **Son inceleme sertleştirmeleri (2026-07-18):** preflight artık `providerMismatch` uyarısı gösteriyor (script başka sağlayıcı için annotate edilmişse üretimden önce uyarır, kota israfını önler); bağlantı sağlayıcılarında hash'in model bileşenine `baseUrl` katılır (aynı slug farklı sunucuya yeniden bağlanırsa eski cache artık sunulmaz).
 
 ## 10. Kapsam dışı
 

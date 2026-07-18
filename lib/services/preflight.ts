@@ -46,6 +46,7 @@ export function planChapter(db: Db, chapterId: string, scriptId?: string): { scr
 export interface Preflight {
   total: number; cached: number; newCalls: number;
   supportsStyle: boolean; styledSegments: number; // supportsStyle=false && styledSegments>0 → UI bilgi notu
+  providerMismatch: boolean; // plandaki ses id'leri aktif sağlayıcıyla uyuşmuyor (mock hariç) → üretim garanti başarısız
   quota: { provider: string; used: number; limit: number; remaining: number } | null;
   fits: boolean;
 }
@@ -61,7 +62,8 @@ export function preflightChapter(db: Db, chapterId: string): Preflight {
     const cast = script.cast.find((c) => c.characterId === s.speaker);
     return Boolean(s.style || s.tags?.length || cast?.baseStyle);
   }).length;
+  const providerMismatch = provider !== 'mock' && plan.some((p) => p.voiceId.split(':')[0] !== provider);
   const limit = quotaLimit(db, provider);
   const quota = limit == null ? null : { provider, used: usedToday(db, provider), limit, remaining: remainingToday(db, provider)! };
-  return { total: plan.length, cached, newCalls, supportsStyle: styleOk, styledSegments, quota, fits: quota == null || newCalls <= quota.remaining };
+  return { total: plan.length, cached, newCalls, supportsStyle: styleOk, styledSegments, providerMismatch, quota, fits: quota == null || newCalls <= quota.remaining };
 }

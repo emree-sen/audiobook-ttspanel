@@ -50,7 +50,7 @@ export default function ChapterPage() {
   const [scriptJson, setScriptJson] = useState('');
   const [scriptErr, setScriptErr] = useState('');
   const [annState, setAnnState] = useState<{ busy: boolean; chunk: number; totalChunks: number; err: string }>({ busy: false, chunk: 0, totalChunks: 0, err: '' });
-  type Preflight = { total: number; cached: number; newCalls: number; supportsStyle: boolean; styledSegments: number; quota: { provider: string; used: number; limit: number; remaining: number } | null; fits: boolean };
+  type Preflight = { total: number; cached: number; newCalls: number; supportsStyle: boolean; styledSegments: number; providerMismatch: boolean; quota: { provider: string; used: number; limit: number; remaining: number } | null; fits: boolean };
   const [pf, setPf] = useState<Preflight | null>(null);
   const [genState, setGenState] = useState<{ busy: boolean; done: number; total: number; err: string; paused: { reason: string; jobId: string } | null }>({ busy: false, done: 0, total: 0, err: '', paused: null });
   const [playingSeg, setPlayingSeg] = useState<string | null>(null);
@@ -290,6 +290,9 @@ export default function ChapterPage() {
         )}
         {pf && !pf.supportsStyle && pf.styledSegments > 0 && (
           <p className="muted"><Icon name="warn" size={12} /> Bu sağlayıcı stil desteklemiyor — segmentler düz okunur.</p>
+        )}
+        {pf && pf.providerMismatch && (
+          <p className="muted"><Icon name="warn" size={12} /> Script başka bir sağlayıcı için hazırlanmış — üretim başarısız olur. Yeniden annotate edin veya cast seslerini düzeltin.</p>
         )}
         <p className="row">
           {(!pf || pf.fits) && (

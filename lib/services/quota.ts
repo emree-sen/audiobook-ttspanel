@@ -14,8 +14,9 @@ export function activeProvider(db: Db): { name: string; model: string } {
     return { name, model: getSetting(db, 'model') ?? process.env.TTS_MODEL ?? '' };
   if (name === 'piper') return { name, model: '' };
   // OpenAI-uyumlu bağlantı: model bağlantı satırından (servis importu yok — döngü riski taşımasın diye tabloya doğrudan bakılır).
+  // baseUrl model'e katılır: aynı slug farklı sunucuya işaret ederse hash değişsin (eski cache sunulmasın).
   const conn = db.select().from(ttsConnections).where(eq(ttsConnections.id, name)).get();
-  return { name, model: conn?.model ?? '' };
+  return { name, model: conn ? `${conn.model}@${conn.baseUrl}` : '' };
 }
 
 export function quotaDay(provider: string, at = Date.now()): string {
