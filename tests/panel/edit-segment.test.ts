@@ -4,6 +4,8 @@ import { createDb, setDbForTests, type Db } from '@/lib/db/client';
 import { createProject } from '@/lib/services/projects';
 import { createChapter } from '@/lib/services/chapters';
 import { editSegment, importScript, latestScript, listSegments } from '@/lib/services/scripts';
+import { planChapter, preflightChapter } from '@/lib/services/preflight';
+import { audioCache } from '@/lib/db/schema';
 import * as segRoute from '@/app/api/segments/[id]/route';
 import * as scriptRoute from '@/app/api/chapters/[id]/script/route';
 
@@ -37,6 +39,17 @@ describe('editSegment', () => {
     expect(() => editSegment(db, 'seg_yok', { text: 'x' })).toThrow(/bulunamadı/);
     editSegment(db, seg.id, { text: 'v2 metni' }); // v2 oluştu → eski seg artık güncel değil
     expect(() => editSegment(db, seg.id, { text: 'x' })).toThrow(/güncel script/);
+  });
+  test('cache sözleşmesi: düzenleme yalnız hedef segmentin hash\'ini değiştirir (1 yeni çağrı)', () => {
+    const { plan } = planChapter(db, chapterId);
+    for (const p of plan) {
+      db.insert(audioCache).values({ hash: p.hash, path: `segments/${p.hash}.wav`, durationMs: 0, usd: 0, createdAt: Date.now() }).run();
+    }
+    expect(preflightChapter(db, chapterId)).toMatchObject({ cached: 5, newCalls: 0 });
+
+    editSegment(db, listSegments(db, scriptId)[1].id, { text: 'Düzenlenmiş metin.' });
+
+    expect(preflightChapter(db, chapterId)).toMatchObject({ cached: 4, newCalls: 1 });
   });
 });
 
