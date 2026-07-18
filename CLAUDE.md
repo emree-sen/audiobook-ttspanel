@@ -25,6 +25,7 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 | Adapter | **Provider-agnostic** (Chirp 3 HD / Azure / ElevenLabs swappable) |
 | İstemci | Responsive web + **PWA** (panel + oynatıcı tek kod) |
 | Analiz akışı | Panel: raw_text → **LLM annotation panel içinde otomatik** (provider-agnostic, Dilim B) → script; elle JSON yapıştırma da destekli |
+| TTS sağlayıcıları | Gemini + OpenAI-uyumlu bağlantılar + Piper lokal + Mock; global tek aktif sağlayıcı; ayarlar panel içinden |
 
 ## Ne yapıldı / ne kaldı
 
@@ -33,8 +34,8 @@ Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-ses
 - ✅ **Dilim B — LLM annotation** (`docs/superpowers/specs/2026-07-16-panel-slice-b-llm-annotation-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-b-llm-annotation.md`): provider-agnostic LLM adapter (Gemini + Mock), ses modu (tek anlatıcı / çok karakterli + maks. karakter), chunk'lama + zod-retry, ses havuzundan otomatik atama, ek talimatla yeniden üretme, cast ses düzeltme, usage/token kaydı.
 - ✅ **UI Redesign — koyu stüdyo** (`docs/superpowers/specs/2026-07-17-panel-ui-redesign-design.md`): token sistemi, Manrope+JetBrains Mono (next/font), dalga-formu marka + eşitleyici animasyon, inline SVG ikonlar, ConfirmButton/EmptyState, 4 sayfa yeniden giydirildi. Davranış/API değişmedi.
 - ✅ **Dilim C1 — Üretim hattı** (`docs/superpowers/specs/2026-07-17-panel-slice-c1-production-line-design.md`, plan: `docs/superpowers/plans/2026-07-17-panel-slice-c1-production-line.md`): jobs/tts_calls/audio_cache tabloları, preflight çağrı+kota hesabı, DB-destekli kuyruk (duraklat/devam, restart toparlama), content-hash cache, segment dosyaları + tek-segment yeniden üretme, progress SSE izleyici.
-- ⬜ **Dilim C2 — Sağlayıcı ekosistemi**: OpenAI-uyumlu endpoint + Piper lokal TTS adapter'ları, sağlayıcı ayarlar ekranı, sağlayıcı-bazlı ses havuzu, adapter yetenek bildirimi. SONRAKİ.
-- ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline.
+- ✅ **Dilim C2 — Sağlayıcı ekosistemi** (spec: docs/superpowers/specs/2026-07-17-panel-slice-c2-provider-ecosystem-design.md, plan: docs/superpowers/plans/2026-07-18-panel-slice-c2-provider-ecosystem.md): OpenAI-uyumlu adlandırılmış bağlantılar + Piper lokal adapter (kullanıcı kurulumlu), /settings ekranı (anahtarlar DB+env, maskeli), DB-tabanlı sağlayıcı-bazlı ses havuzu, yetenek bildirimi (stilsiz sağlayıcıda stil düşürme + not).
+- ⬜ **Dilim D — Kütüphane + PWA oynatıcı**: liste·oynat·resume·MediaSession·offline. SONRAKİ.
 
 ## Nasıl çalıştırılır
 
@@ -68,7 +69,7 @@ npx tsx src/cli/generate.ts <script.json> --out ./out --provider mock
 
 ## Bilinen kısıtlar / bulgular (KRİTİK)
 
-1. **GÜNLÜK KOTA (RPD) — EN KRİTİK BLOKER:** `gemini-3.1-flash-tts` modelinde **günde 100 istek** hard limit (429 metric: `generate_requests_per_model_per_day`, limit 100, per project per model). Bu **free-tier** limiti — kullanıcının 'prepay' key'i + Google free-trial kredisi bu per-model günlük kotayı **YÜKSELTMİYOR** (free-trial Cloud kredisidir, AI Studio Gemini API tier'ını değiştirmez). Sonuç: şu an günde **~1 bölüm** (87 segment) ancak; hacim (Faz 2) imkansız. Bir bölüm bile bugünkü test çağrılarıyla birleşince yarıda kaldı (40/87). **Çözümler:** (a) **Gemini API projesinde gerçek faturalama/billing aç** → paid tier RPD binlerce olur (asıl çözüm); (b) hacim için **Cloud TTS Chirp 3 HD** (karakter-bazlı, ayrı & yüksek kota, Cloud kredisi geçerli) veya Vertex — ayrı adapter gerektirir; (c) günlük reset sonrası (00:00 PT) temiz bir çalıştırma <100 segment bölümü tek seferde yapar. Ek olarak RPM için adapter'da throttle (6s) + stilli→düz fallback + segment-atla dayanıklılığı var. GÜNCELLEME (C1): panel artık preflight + kota defteri + duraklat/devam ile bu limiti yönetiyor; faturalama/Chirp kararı C2 ile birlikte.
+1. **GÜNLÜK KOTA (RPD) — EN KRİTİK BLOKER:** `gemini-3.1-flash-tts` modelinde **günde 100 istek** hard limit (429 metric: `generate_requests_per_model_per_day`, limit 100, per project per model). Bu **free-tier** limiti — kullanıcının 'prepay' key'i + Google free-trial kredisi bu per-model günlük kotayı **YÜKSELTMİYOR** (free-trial Cloud kredisidir, AI Studio Gemini API tier'ını değiştirmez). Sonuç: şu an günde **~1 bölüm** (87 segment) ancak; hacim (Faz 2) imkansız. Bir bölüm bile bugünkü test çağrılarıyla birleşince yarıda kaldı (40/87). **Çözümler:** (a) **Gemini API projesinde gerçek faturalama/billing aç** → paid tier RPD binlerce olur (asıl çözüm); (b) hacim için **Cloud TTS Chirp 3 HD** (karakter-bazlı, ayrı & yüksek kota, Cloud kredisi geçerli) veya Vertex — ayrı adapter gerektirir; (c) günlük reset sonrası (00:00 PT) temiz bir çalıştırma <100 segment bölümü tek seferde yapar. Ek olarak RPM için adapter'da throttle (6s) + stilli→düz fallback + segment-atla dayanıklılığı var. GÜNCELLEME (C1): panel artık preflight + kota defteri + duraklat/devam ile bu limiti yönetiyor; faturalama/Chirp kararı C2 ile birlikte. GÜNCELLEME (C2): hacim için artık faturasız alternatifler panelde: Piper (lokal, bedava) veya OpenAI-uyumlu lokal sunucular; Chirp adapter'ı istenirse ileride ayrı iş.
 2. **Kırılgan stil prompt'ları:** Bazı stil talimatları modeli sessizce boş yanıta itiyor (preview, non-deterministik). Adapter'da **stilli → düz metin fallback** var (o segment stilsiz de olsa ses üretilir).
 3. **Türkçe doğallık:** ampirik doğrulandı (3.1 kabul); adapter swappable olduğundan gerekirse Chirp/Azure denenebilir.
 
@@ -81,4 +82,4 @@ npx tsx src/cli/generate.ts <script.json> --out ./out --provider mock
 
 ## Sonraki oturum için öneri
 
-Dilim C2 (sağlayıcı ekosistemi) için brainstorming: OpenAI-uyumlu endpoint adapter (lokal sunucular), Piper yerleşik lokal TTS, sağlayıcı ayarlar ekranı, sağlayıcı-bazlı ses havuzu + adapter yetenek bildirimi. Ertelenmişler: cache GC, sidebar hata durumu, PWA statik varlık auth (D), dokunmatik tile aksiyonları (D).
+Dilim D (kütüphane + PWA oynatıcı) için brainstorming: proje/bölüm listesi, oynat/duraklat/kaldığı yerden devam, MediaSession entegrasyonu, offline (service worker + önbellek), PWA manifest/kurulum. Ertelenmişler: ses önizleme düğmesi, varsayılan anlatıcı sesi UI'sı, yalnız-mp3 OpenAI-uyumlu sunucular, cache GC, sidebar hata durumu, PWA statik varlık auth (D), dokunmatik tile aksiyonları (D).
