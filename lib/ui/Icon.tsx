@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 export type IconName =
   | 'play' | 'trash' | 'pencil' | 'up' | 'down' | 'plus'
   | 'person' | 'doc' | 'wave' | 'speaker' | 'warn' | 'logout' | 'spinner'
-  | 'chev' | 'menu' | 'folder';
+  | 'chev' | 'menu' | 'folder' | 'gear';
 
 // Saf inline SVG ikon seti — bağımlılık yok; stroke tabanlı, currentColor.
 const paths: Record<IconName, ReactElement> = {
@@ -23,6 +23,7 @@ const paths: Record<IconName, ReactElement> = {
   chev: <path d="M6 3.5 10.5 8 6 12.5" />,
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
   folder: <path d="M1.8 4.5a1 1 0 0 1 1-1h3.4l1.5 1.6h5.5a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />,
+  gear: <><circle cx="8" cy="8" r="2.4" /><path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5" /></>,
 };
 
 export function Icon({ name, size = 16, label, className }: { name: IconName; size?: number; label?: string; className?: string }) {

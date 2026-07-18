@@ -269,3 +269,9 @@ summary:hover { color: var(--text); }
     border-radius: 999px; padding: 0.85rem; box-shadow: var(--shadow);
   }
 }
+
+/* Ayarlar: bağlantı katlanır kartı */
+details.conn { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .5rem .75rem; margin: .5rem 0; }
+details.conn > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .6rem; }
+details.conn > summary::-webkit-details-marker { display: none; }
+.row.wrap { flex-wrap: wrap; }
