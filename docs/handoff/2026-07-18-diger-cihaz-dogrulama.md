@@ -44,3 +44,13 @@ db.close();
 
 - Dilim C2 merge edildi: `/settings` ekranı, sağlayıcılar, ses havuzları (git pull sonrası `npm install` gerekmez — yeni bağımlılık yok; migration ilk açılışta otomatik).
 - Dilim C3 spec'i onay aşamasında (`docs/superpowers/specs/2026-07-18-panel-slice-c3-production-flow-design.md`): segment birleştirme, script/segment düzenleme, ayrı Birleştir adımı. Bu cihazda C3 UYGULAMAYA BAŞLAMA — ana makine yürütüyor; görev yalnız yukarıdaki doğrulama.
+
+## Bulgular (2026-07-18, diğer cihaz)
+
+İnceleme scripti + ek sıra kontrolü çalıştırıldı. Tek bölüm var: **"bölüm 1" (v1, 16 segment)**.
+
+- **Mükerrer segment: 0** → H1 **ÇÜRÜDÜ**. Ayrıca bölüm metni **1.073 karakter** (<12k), yani chunk'lama hiç devreye girmemiş — H1 bu bölüm için zaten mümkün değildi.
+- **Sıra kontrolü:** 16 segmentin ilk 40 karakteri raw_text içinde arandı; bulunan tüm pozisyonlar **kesin monoton artan** — script sırası kaynağın doğal akışını birebir izliyor. Eşleşmeyen 2 segment önemsiz LLM normalizasyonu çıktı (raw "gülüm**s**eyip" → script "gülüm**l**eyip"; "…" → "..."), tekrar/sıra sorunu değil.
+- **Render sayısı: 4** → H2 **GÜÇLENDİ**. Zaman damgaları (lokal): 17:11:34, 17:11:43, 17:14:22, 17:14:35 — iki çift halinde, çift içi ~9-12 sn arayla. Saniyeler arayla oluşan çiftler dikkat çekici (çift tıklama / çift stitch tetiklenmesi olabilir — ana makine isterse ayrıca bakabilir).
+
+**Sonuç:** Script temiz; sıra karışıklığı/tekrar script'te YOK. Şikâyet büyük olasılıkla **eski bir render'ın dinlenmesinden** (H2). Kullanıcıdan **en son render'ı (17:14:35)** dinleyip sorunun sürüp sürmediğini teyit etmesi istendi. C3'e chunk-dedup savunması eklemek için bu bölümden kanıt çıkmadı.
