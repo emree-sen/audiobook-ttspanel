@@ -50,6 +50,23 @@ export function changeCastVoice(db: Db, chapterId: string, characterId: string, 
   return { scriptId: saved.scriptId, version: saved.version };
 }
 
+// En güncel scriptte TEK segmentin metnini/stilini değiştirip yeni versiyon yazar (LLM/TTS çağrısı yok).
+// Hash değişir → üretimde yalnız bu segment yeni çağrı olur; kalanlar cache'ten (C1).
+export function editSegment(db: Db, segmentId: string, patch: { text?: string; style?: string | null }): { scriptId: string; version: number } {
+  const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
+  if (!row) throw new Error('Segment bulunamadı');
+  const scr = latestScript(db, row.chapterId);
+  if (!scr || scr.id !== row.scriptId) throw new Error('Segment güncel script’e ait değil — sayfayı yenileyin');
+  if (patch.text !== undefined && !patch.text.trim()) throw new Error('Segment metni boş olamaz');
+  const json = JSON.parse(scr.json) as { segments: { text: string; style?: string }[] };
+  const seg = json.segments[row.idx];
+  if (!seg) throw new Error('Segment script içinde bulunamadı');
+  if (patch.text !== undefined) seg.text = patch.text.trim();
+  if (patch.style !== undefined) { if (patch.style?.trim()) seg.style = patch.style.trim(); else delete seg.style; }
+  const saved = saveScript(db, row.chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);
+  return { scriptId: saved.scriptId, version: saved.version };
+}
+
 export function latestScript(db: Db, chapterId: string): ScriptRow | undefined {
   return db.select().from(scripts).where(eq(scripts.chapterId, chapterId)).orderBy(desc(scripts.version)).limit(1).get();
 }
