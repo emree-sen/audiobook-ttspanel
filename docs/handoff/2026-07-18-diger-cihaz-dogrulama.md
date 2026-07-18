@@ -54,3 +54,24 @@ db.close();
 - **Render sayısı: 4** → H2 **GÜÇLENDİ**. Zaman damgaları (lokal): 17:11:34, 17:11:43, 17:14:22, 17:14:35 — iki çift halinde, çift içi ~9-12 sn arayla. Saniyeler arayla oluşan çiftler dikkat çekici (çift tıklama / çift stitch tetiklenmesi olabilir — ana makine isterse ayrıca bakabilir).
 
 **Sonuç:** Script temiz; sıra karışıklığı/tekrar script'te YOK. Şikâyet büyük olasılıkla **eski bir render'ın dinlenmesinden** (H2). Kullanıcıdan **en son render'ı (17:14:35)** dinleyip sorunun sürüp sürmediğini teyit etmesi istendi. C3'e chunk-dedup savunması eklemek için bu bölümden kanıt çıkmadı.
+
+## Bulgular 2 — kök neden bulundu (2026-07-18, aynı gün devam)
+
+Kullanıcı **en son render'da da tekrarın sürdüğünü** doğruladı → H2 de çürüdü. Sistematik iz sürme (segments tablosu → stitch → segment wav'ları → tts_calls) iki bağımsız kök neden ortaya çıkardı:
+
+### KN1 — Tekrar, TTS model çıktısının İÇİNDE (asıl "tekrar" sesi)
+
+- `segments` tablosu da temiz: 16 satır, tekil idx, JSON'la birebir; `stitchChapter` her parçayı tam bir kez ekliyor (son mp3 ≈ 142 sn ≈ wav toplamı ~139 sn + duraklar — matematik tutuyor).
+- Ama segment wav'larının **süre/metin oranı absürt**: idx4 "İstediğin başka bir toplantı yok." (34 kr) → **14,0 sn** (beklenen ~3 sn); idx8 (66 kr) → **28,6 sn**; idx15 (54 kr) → 14,0 sn. 16 segmentin ~9'u şüpheli (<8 kr/sn).
+- Dosyalar bozuk/birleşik değil: WAV header = içerik, **tek API yanıtı**. Enerji zarfı: kısa konuşma öbekleri + uzun sessizlikler serpiştirilmiş (idx4: %57 sessizlik, konuşma ~6 sn = metnin ~2 katı) → **`gemini-3.1-flash-tts-preview` bazı stilli kısa segmentlerde metni parça parça tekrarlıyor + uzun sessizlik üretiyor** (non-deterministik: AYNI stil direktifli idx5 → 2,2 sn, normal). Adapter süre makullük kontrolü yapmadan kabul ediyor.
+- "Sıra karışması" algısına katkı: kaynak metnin kendisi cümle yankıları içeriyor (Klein, Kaspars'ın "Maric burada değil / Silahtan başka..." sözlerini tekrarlıyor — idx3↔idx9, idx5↔idx8) + tekrarlı segment sesleri araya girince akış bozuk algılanıyor.
+
+### KN2 — Aynı iş İKİ worker tarafından eşzamanlı yürütülmüş (kota 2x yanıyor + çift render)
+
+- `tts_calls` günlüğü: hemen her segment **2 kez üretilmiş, iç içe** (idx0: 17:09:16 VE 17:09:17 — adapter throttle 6 sn iken 1 sn arayla → **iki ayrı adapter örneği**). 16 segment için 25+ başarılı çağrı.
+- Mekanizma: `producer.ts` içindeki `workerPromise` modül-global'i Next.js dev'de rota başına ayrı modül örneğine düşebiliyor (`generate` + `progress` rotaları ayrı bundle) → `ensureWorker` tekilliği kırılıyor → aynı `queued` işi iki worker alıyor. İş sonunda ikisi de stitch → **17:11:34 + 17:11:43 render çifti**. (17:14 çifti ise iki ayrı tek-segment regen'in otomatik stitch'i — C3'te zaten kaldırılıyor.)
+- Yan etki: günlük 100'lük RPD kotası fiilen ikiye katlanarak yanıyor.
+
+### Ana makine için öneri (karar kullanıcıda)
+
+- ~~Chunk-dedup savunması~~ gereksiz (H1 çürük). Yerine C3 kapsamına aday: **(a)** adapter'a süre makullük bekçisi (ses süresi ≈ karakter/hız beklentisinin ~2,5 katını aşarsa yeniden dene; N denemede düzelmezse işaretle), **(b)** worker tekilliğini `globalThis` + DB-seviyesi iş kilidiyle sağlamlaştırma, **(c)** zaten planlı mergeSegments (uzun segmentler bu model arızasını da seyreltiyor).
