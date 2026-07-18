@@ -150,6 +150,17 @@ describe('runJob', () => {
     expect(db.select().from(jobs).where(eq(jobs.id, job.id)).get()?.status).toBe('canceled');
     expect(n).toBeLessThanOrEqual(2); // iptalden sonra çağrı yok
   });
+
+  test('aynı işe eşzamanlı iki runJob: yalnız biri sahiplenir, çağrı sayısı segment sayısını aşmaz', async () => {
+    const { db, chapterId } = setup(); // mevcut yardımcı; script 5 segmentli fixture
+    let calls = 0;
+    const spy = { id: 'mock', async synthesize(req: TtsSegmentRequest) { calls++; return new MockAdapter().synthesize(req); } };
+    const job = enqueueJob(db, chapterId);
+    await Promise.all([runJob(db, job.id, spy), runJob(db, job.id, spy)]);
+    expect(calls).toBe(5); // çift worker olsaydı 10'a çıkardı (KN2 saha bulgusu)
+    const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get()!;
+    expect(fresh.status).toBe('done');
+  });
 });
 
 describe('stil düşürme (yetenek bildirimi)', () => {

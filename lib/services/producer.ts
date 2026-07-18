@@ -78,9 +78,12 @@ async function saveSegmentAudio(db: Db, segmentRowId: string, hash: string, audi
 }
 
 export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promise<void> {
-  const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get();
-  if (!job || (job.status !== 'queued' && job.status !== 'running')) return;
-  setJob(db, job.id, { status: 'running', pausedReason: null });
+  // KN2: işi atomik sahiplen — aynı queued işi ikinci bir worker alamaz (dev'de rota-başına
+  // modül örneği ensureWorker tekilliğini kırabiliyordu; kota 2x yanıyordu).
+  const claimed = db.update(jobs).set({ status: 'running', pausedReason: null, updatedAt: Date.now() })
+    .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued'))).run();
+  if (claimed.changes === 0) return;
+  const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get()!;
   const { name: provider, model } = activeProvider(db);
   try {
     const { script, plan } = planChapter(db, job.chapterId, job.scriptId);
@@ -150,12 +153,12 @@ export function recoverJobs(db: Db): void {
 }
 
 // Süreç-içi tek worker: kuyruktaki (duraklamamış) işleri sırayla yürütür.
-// Zaten çalışıyorsa AYNI koşunun promise'ini döndürür — await eden, sürmekte olan koşuya katılır
-// (testlerde deterministik bekleme; rotalarda void ile ateşle-unut).
-let workerPromise: Promise<void> | null = null;
+// globalThis çapası: Next dev'de her rota ayrı modül örneği yükleyebilir; modül-global
+// tekilliği bu yüzden yetmez (KN2). Zaten çalışıyorsa AYNI koşunun promise'ine katılır.
+const G = globalThis as unknown as { __wntWorker?: Promise<void> | null };
 export function ensureWorker(db: Db): Promise<void> {
-  if (workerPromise) return workerPromise;
-  workerPromise = (async () => {
+  if (G.__wntWorker) return G.__wntWorker;
+  G.__wntWorker = (async () => {
     await Promise.resolve(); // dış atama tamamlanmadan iç mantık başlamasın — yoksa kuyrukta iş bulunamayınca
     // (hiç await'e uğramadan) fonksiyon senkron biter; finally'deki sıfırlama, dıştaki atamadan ÖNCE
     // çalışıp hemen ezilir ve workerPromise sonsuza dek "ölü" bir promise'e saplanır (bir sonraki
@@ -170,10 +173,10 @@ export function ensureWorker(db: Db): Promise<void> {
         await runJob(db, next.id, adapterFromSettings(db));
       }
     } finally {
-      workerPromise = null;
+      G.__wntWorker = null;
     }
   })();
-  return workerPromise;
+  return G.__wntWorker;
 }
 
 // Tek segmenti yeniden üretir (cache'i üzerine yazar) ve bölümü yeniden birleştirir.
