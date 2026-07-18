@@ -7,6 +7,7 @@ import { createChapter } from '@/lib/services/chapters';
 import { importScript } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
 import { planChapter, preflightChapter, segmentHash } from '@/lib/services/preflight';
+import { supportsStyle } from '@/lib/services/generation';
 
 const FIXTURE = readFileSync('fixtures/sample-tr.json', 'utf8');
 
@@ -82,5 +83,26 @@ describe('preflightChapter', () => {
     const pf = preflightChapter(db, chapterId);
     expect(pf.quota).toBeNull();
     expect(pf.fits).toBe(true);
+  });
+});
+
+describe('stil düşürme (yetenek bildirimi)', () => {
+  test('piper: plan stilsiz; hash stilsiz formülle birebir', () => {
+    const { db, chapterId } = setup();
+    setSetting(db, 'provider', 'piper');
+    const { script, plan } = planChapter(db, chapterId);
+    expect(plan.every((p) => p.style === undefined && p.tags === undefined)).toBe(true);
+    expect(plan[0].hash).toBe(segmentHash({
+      provider: 'piper', model: '', voice: plan[0].voiceId,
+      language: script.language, text: plan[0].text,
+    }));
+  });
+  test('preflight: supportsStyle=false + styledSegments>0 (piper); gemini true', () => {
+    const { db, chapterId } = setup();
+    expect(preflightChapter(db, chapterId).supportsStyle).toBe(true);
+    setSetting(db, 'provider', 'piper');
+    const pf = preflightChapter(db, chapterId);
+    expect(pf.supportsStyle).toBe(false);
+    expect(pf.styledSegments).toBeGreaterThan(0); // fixture'da stilli segmentler var
   });
 });
