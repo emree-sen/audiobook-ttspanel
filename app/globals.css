@@ -147,6 +147,7 @@ label { color: var(--muted); font-size: 0.85rem; }
 .badge.done { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
 .badge.error, .badge.failed { background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); }
 .badge.generating { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.badge.voiced { background: color-mix(in srgb, #2dd4bf 16%, transparent); color: #2dd4bf; }
 
 /* ── Tablo ── */
 table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
@@ -250,6 +251,7 @@ summary:hover { color: var(--text); }
 .dot.done { background: var(--ok); }
 .dot.error { background: var(--err); }
 .dot.generating { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.dot.voiced { background: #2dd4bf; }
 .dot.draft { opacity: 0.5; }
 .side-scrim { display: none; }
 .side-toggle { display: none; }
