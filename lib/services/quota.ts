@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { ttsCalls } from '../db/schema';
+import { ttsConnections, ttsCalls } from '../db/schema';
 import { newId } from '../id';
 import { getSetting } from './settings';
 
@@ -9,10 +9,13 @@ const RESET_TZ: Record<string, string> = { gemini: 'America/Los_Angeles' };
 const DEFAULT_LIMITS: Record<string, number> = { gemini: 100 };
 
 export function activeProvider(db: Db): { name: string; model: string } {
-  return {
-    name: getSetting(db, 'provider') ?? process.env.TTS_PROVIDER ?? 'gemini',
-    model: getSetting(db, 'model') ?? process.env.TTS_MODEL ?? '',
-  };
+  const name = getSetting(db, 'provider') ?? process.env.TTS_PROVIDER ?? 'gemini';
+  if (name === 'gemini' || name === 'mock')
+    return { name, model: getSetting(db, 'model') ?? process.env.TTS_MODEL ?? '' };
+  if (name === 'piper') return { name, model: '' };
+  // OpenAI-uyumlu bağlantı: model bağlantı satırından (servis importu yok — döngü riski taşımasın diye tabloya doğrudan bakılır).
+  const conn = db.select().from(ttsConnections).where(eq(ttsConnections.id, name)).get();
+  return { name, model: conn?.model ?? '' };
 }
 
 export function quotaDay(provider: string, at = Date.now()): string {
