@@ -8,7 +8,8 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 - ✅ Web panel (Dilim A): proje/bölüm yönetimi, script import, üretim + dinleme
 - ✅ LLM annotation: ham metin + anlatım tarzı + ses modu → otomatik script (Gemini, BYO-key); ek talimatla yeniden üretme; cast ses düzeltme
 - ✅ Üretim hattı: DB-destekli kuyruk (tarayıcı kapansa da sürer), preflight çağrı hesabı + günlük kota göstergesi, kotaya çarpınca duraklat/devam, content-hash önbelleği (değişmeyen segment tekrar TTS'e gitmez), segment başına dinleme + tek-segment yeniden üretme
-- ⬜ Sağlayıcı ekosistemi (OpenAI-uyumlu endpoint + Piper lokal TTS + ayarlar ekranı), PWA oynatıcı
+- ✅ Sağlayıcı ekosistemi (Dilim C2): OpenAI-uyumlu bağlantılar + Piper lokal TTS, Ayarlar ekranı, sağlayıcı-bazlı ses havuzu, stilsiz sağlayıcılarda otomatik stil düşürme notu
+- ⬜ Kütüphane + PWA oynatıcı
 
 ## Kurulum
 
