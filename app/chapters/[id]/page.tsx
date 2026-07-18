@@ -360,7 +360,7 @@ export default function ChapterPage() {
         )}
         {genState.err && <p className="err">{genState.err}</p>}
         <p className="row">
-          <button onClick={stitch} disabled={stitchBusy || genState.busy || !['voiced', 'done'].includes(chapter.status)}>
+          <button onClick={stitch} disabled={stitchBusy || genState.busy || annState.busy || regenBusy !== null || !['voiced', 'done'].includes(chapter.status)}>
             {stitchBusy ? <Icon name="spinner" /> : <Icon name="doc" />} Birleştir (mp3)
           </button>
           {chapter.status === 'voiced' && (

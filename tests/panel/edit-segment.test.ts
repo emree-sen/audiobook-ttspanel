@@ -5,6 +5,7 @@ import { createProject } from '@/lib/services/projects';
 import { createChapter } from '@/lib/services/chapters';
 import { editSegment, importScript, latestScript, listSegments } from '@/lib/services/scripts';
 import { planChapter, preflightChapter } from '@/lib/services/preflight';
+import { enqueueJob } from '@/lib/services/producer';
 import { audioCache } from '@/lib/db/schema';
 import * as segRoute from '@/app/api/segments/[id]/route';
 import * as scriptRoute from '@/app/api/chapters/[id]/script/route';
@@ -50,6 +51,11 @@ describe('editSegment', () => {
     editSegment(db, listSegments(db, scriptId)[1].id, { text: 'Düzenlenmiş metin.' });
 
     expect(preflightChapter(db, chapterId)).toMatchObject({ cached: 4, newCalls: 1 });
+  });
+  test('bölümde aktif iş varken düzenleme reddedilir', () => {
+    enqueueJob(db, chapterId);
+    const seg = listSegments(db, scriptId)[0];
+    expect(() => editSegment(db, seg.id, { text: 'x' })).toThrow(/aktif bir üretim işi/);
   });
 });
 

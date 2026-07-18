@@ -1,6 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { scripts, segments } from '../db/schema';
+import { jobs, scripts, segments } from '../db/schema';
 import { newId } from '../id';
 import { updateChapter } from './chapters';
 import { parseScript } from '@/src/core/schema';
@@ -55,6 +55,9 @@ export function changeCastVoice(db: Db, chapterId: string, characterId: string, 
 export function editSegment(db: Db, segmentId: string, patch: { text?: string; style?: string | null }): { scriptId: string; version: number } {
   const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
   if (!row) throw new Error('Segment bulunamadı');
+  const active = db.select().from(jobs)
+    .where(and(eq(jobs.chapterId, row.chapterId), inArray(jobs.status, ['queued', 'running']))).get();
+  if (active) throw new Error('Bölümde aktif bir üretim işi var — düzenlemeden önce bitmesini bekleyin veya duraklatılmışsa iptal edin');
   const scr = latestScript(db, row.chapterId);
   if (!scr || scr.id !== row.scriptId) throw new Error('Segment güncel script’e ait değil — sayfayı yenileyin');
   if (patch.text !== undefined && !patch.text.trim()) throw new Error('Segment metni boş olamaz');
