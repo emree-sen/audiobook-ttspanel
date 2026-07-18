@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('OpenAiCompatAdapter', () => {
   test('doğru URL/gövde/başlıkla POST eder; wav süresi ve chars maliyeti döner', async () => {
     let captured: { url: string; init: RequestInit } | null = null;
-    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => { captured = { url, init }; return new Response(WAV); });
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => { captured = { url, init }; return new Response(new Uint8Array(WAV)); });
     const a = new OpenAiCompatAdapter({ id: 'sunucum', baseUrl: 'http://localhost:8000/v1/', apiKey: 'gizli', model: 'tts-1' });
     expect(a.id).toBe('sunucum');
     expect(a.capabilities).toEqual({ style: false });
@@ -25,7 +25,7 @@ describe('OpenAiCompatAdapter', () => {
   });
   test('anahtarsız bağlantıda Authorization başlığı yok', async () => {
     let headers: Record<string, string> = {};
-    vi.stubGlobal('fetch', async (_u: string, init: RequestInit) => { headers = init.headers as Record<string, string>; return new Response(WAV); });
+    vi.stubGlobal('fetch', async (_u: string, init: RequestInit) => { headers = init.headers as Record<string, string>; return new Response(new Uint8Array(WAV)); });
     await new OpenAiCompatAdapter({ id: 's', baseUrl: 'http://x/v1', model: 'm' }).synthesize(REQ);
     expect(headers.Authorization).toBeUndefined();
   });
