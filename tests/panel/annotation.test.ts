@@ -6,7 +6,7 @@ import { latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
 import { createConnection } from '@/lib/services/connections';
 import { addVoice } from '@/lib/services/voices';
-import { annotateChapter, chunkText, llmAdapterFromSettings } from '@/lib/services/annotation';
+import { annotateChapter, chunkText, llmAdapterFromSettings, mergeSegments, MERGE_MAX_CHARS } from '@/lib/services/annotation';
 import { MockLlmAdapter } from '@/lib/llm/mock';
 import type { LlmAdapter } from '@/lib/llm/types';
 
@@ -214,5 +214,68 @@ describe('llmAdapterFromSettings', () => {
     delete process.env.GEMINI_API_KEY;
     try { expect(() => llmAdapterFromSettings(db)).toThrow(/GEMINI_API_KEY/); }
     finally { if (saved) process.env.GEMINI_API_KEY = saved; }
+  });
+});
+
+describe('mergeSegments', () => {
+  const seg = (text: string, over: Partial<{ speaker: string; type: string; style?: string; pause_after_ms?: number }> = {}) =>
+    ({ speaker: 'narrator', type: 'narration', text, ...over });
+
+  test('art arda aynı konuşmacı+stil birleşir; id sırası korunur', () => {
+    const out = mergeSegments([seg('Bir.'), seg('İki.'), seg('Üç.')]);
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toBe('Bir. İki. Üç.');
+  });
+  test('stil farkı birleşmeyi keser (boş vs dolu dahil)', () => {
+    const out = mergeSegments([seg('A.'), seg('B.', { style: 'gergin' }), seg('C.', { style: 'gergin' })]);
+    expect(out.map((s) => s.text)).toEqual(['A.', 'B. C.']);
+  });
+  test('konuşmacı farkı birleşmeyi keser (multi korunur)', () => {
+    const out = mergeSegments([seg('A.'), seg('B.', { speaker: 'kaan' }), seg('C.', { speaker: 'kaan' })]);
+    expect(out.map((s) => s.text)).toEqual(['A.', 'B. C.']);
+  });
+  test('pause SINIRDIR: pause taşıyan segmentin üstüne eklenmez; birleşende pause son parçanınki', () => {
+    const out = mergeSegments([seg('A.', { pause_after_ms: 300 }), seg('B.'), seg('C.', { pause_after_ms: 500 })]);
+    expect(out.map((s) => s.text)).toEqual(['A.', 'B. C.']);
+    expect(out[0].pause_after_ms).toBe(300);
+    expect(out[1].pause_after_ms).toBe(500);
+  });
+  test('700 karakter tavanı aşılmaz; type ilk parçanınki', () => {
+    const a = seg('x'.repeat(680)); const b = seg('y'.repeat(30));
+    expect(mergeSegments([a, b])).toHaveLength(2);
+    const out = mergeSegments([seg('Soru?', { type: 'dialogue' }), seg('Cevap.')]);
+    expect(out[0].type).toBe('dialogue');
+  });
+  test('girdiyi mutasyona uğratmaz', () => {
+    const input = [seg('A.'), seg('B.')];
+    mergeSegments(input);
+    expect(input[0].text).toBe('A.');
+  });
+});
+
+describe('annotateChapter + mergeSegments entegrasyonu', () => {
+  test('narrator modunda ardışık stilsiz LLM segmentleri tek segmente iner', async () => {
+    // kurulum: dosyadaki mevcut yardımcıyla bölüm oluştur (voiceMode narrator, rawText dolu)
+    const { db, chapterId } = setup('narrator');
+    const fake: LlmAdapter = {
+      id: 'fake',
+      async annotate() {
+        return {
+          json: {
+            cast: [], segments: [
+              { speaker: 'narrator', type: 'narration', text: 'Bir cümle.' },
+              { speaker: 'narrator', type: 'narration', text: 'İki cümle.' },
+              { speaker: 'ali', type: 'dialogue', text: 'Merhaba dedi.' }, // cast dışı → narrator'a düşer → o da birleşir
+            ], pronunciations: [],
+          },
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    };
+    const out = await annotateChapter(db, chapterId, fake);
+    expect(out.segmentCount).toBe(1);
+    const script = JSON.parse(latestScript(db, chapterId)!.json);
+    expect(script.segments[0].text).toBe('Bir cümle. İki cümle. Merhaba dedi.');
+    expect(script.segments[0].id).toBe('s1');
   });
 });

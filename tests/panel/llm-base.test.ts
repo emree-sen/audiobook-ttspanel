@@ -44,6 +44,18 @@ describe('buildSystemPrompt', () => {
     expect(s).toContain('KULLANICI DÜZELTMESİ');
     expect(s).toContain('ÖNCEKİ DENEME ÖZETİ: v1: 10 segment');
   });
+  test('narrator modunda paragraf-bazlı segment kuralı + kişi taklidi yasağı; 1-3 cümle kuralı YOK', () => {
+    const p = buildSystemPrompt({ voiceMode: 'narrator', maxCharacters: 6 });
+    expect(p).toContain('tek anlatıcı'); // mock marker korunur
+    expect(p).toContain('paragraf bazlı, 3-6 cümle');
+    expect(p).toContain('kişi taklidi tarifleri');
+    expect(p).not.toContain('1-3 cümle');
+  });
+  test('multi modunda 1-3 cümle kuralı durur', () => {
+    const p = buildSystemPrompt({ voiceMode: 'multi', maxCharacters: 6 });
+    expect(p).toContain('çok karakterli'); // mock marker korunur
+    expect(p).toContain('1-3 cümle');
+  });
 });
 
 describe('buildUserPrompt', () => {
