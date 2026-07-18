@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createDb } from '@/lib/db/client';
 import { audioDir } from '@/lib/config';
-import { jobs, ttsCalls } from '@/lib/db/schema';
+import { jobs, renders, ttsCalls } from '@/lib/db/schema';
 import { createProject } from '@/lib/services/projects';
 import { createChapter, getChapter } from '@/lib/services/chapters';
 import { importScript, latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
 import { listRenders } from '@/lib/services/generation';
-import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob, synthesizeChecked } from '@/lib/services/producer';
+import { enqueueJob, ensureWorker, latestJob, recoverJobs, resumeJob, runJob, stitchLatest, synthesizeChecked } from '@/lib/services/producer';
 import { MockAdapter } from '@/src/core/tts/mock';
 import type { TtsAdapter, TtsResult, TtsSegmentRequest } from '@/src/core/types';
 
@@ -46,7 +46,7 @@ describe('enqueueJob', () => {
 });
 
 describe('runJob', () => {
-  test('tam üretim: segment dosyaları + cache + render + job/chapter done', async () => {
+  test('tam üretim: segment dosyaları + cache + job done, bölüm voiced (render YOK)', async () => {
     const { db, chapterId } = setup();
     const job = enqueueJob(db, chapterId);
     await runJob(db, job.id, new MockAdapter());
@@ -56,8 +56,16 @@ describe('runJob', () => {
     const segs = listSegments(db, latestScript(db, chapterId)!.id);
     expect(segs.every((s) => s.status === 'done' && s.audioPath?.startsWith('segments/') && s.contentHash)).toBe(true);
     expect(existsSync(join(audioDir(), segs[0].audioPath!))).toBe(true);
-    expect(listRenders(db, chapterId)).toHaveLength(1);
-    expect(getChapter(db, chapterId)?.status).toBe('done');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+  });
+
+  test('runJob sonunda render YOK; bölüm voiced olur', async () => {
+    const { db, chapterId } = setup();
+    const job = enqueueJob(db, chapterId);
+    await runJob(db, job.id, new MockAdapter());
+    expect(db.select().from(renders).all()).toHaveLength(0);
+    expect(getChapter(db, chapterId)!.status).toBe('voiced');
   });
 
   test('ikinci üretim tamamen cache\'ten: 0 yeni çağrı', async () => {
@@ -67,7 +75,8 @@ describe('runJob', () => {
     await runJob(db, enqueueJob(db, chapterId).id, new MockAdapter());
     expect(callCount(db)).toBe(before);
     expect(latestJob(db, chapterId)!.status).toBe('done');
-    expect(listRenders(db, chapterId)).toHaveLength(2);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
   });
 
   test('limitCalls: tavana gelince duraklar; resume limitsiz tamamlar', async () => {
@@ -92,7 +101,7 @@ describe('runJob', () => {
     expect(j).toMatchObject({ status: 'queued', pausedReason: 'quota', doneCount: 3 });
   });
 
-  test('segment hatası: failed + iş sürer + render oluşur', async () => {
+  test('segment hatası: failed + iş sürer + job done, bölüm voiced (render oluşturulmaz)', async () => {
     const { db, chapterId } = setup();
     const inner = new MockAdapter();
     let n = 0;
@@ -108,7 +117,8 @@ describe('runJob', () => {
     expect(segs.filter((s) => s.status === 'failed')).toHaveLength(1);
     expect(segs[1].error).toMatch(/kota doldu/);
     expect(latestJob(db, chapterId)!.status).toBe('done');
-    expect(listRenders(db, chapterId)).toHaveLength(1);
+    expect(getChapter(db, chapterId)?.status).toBe('voiced');
+    expect(listRenders(db, chapterId)).toHaveLength(0);
     expect(callCount(db)).toBe(5); // başarısız da defterde
   });
 
@@ -160,6 +170,27 @@ describe('runJob', () => {
     expect(calls).toBe(5); // çift worker olsaydı 10'a çıkardı (KN2 saha bulgusu)
     const fresh = db.select().from(jobs).where(eq(jobs.id, job.id)).get()!;
     expect(fresh.status).toBe('done');
+  });
+});
+
+describe('stitchLatest', () => {
+  test('done segmentlerden render üretir; bölüm done olur', async () => {
+    const { db, chapterId } = setup();
+    const job = enqueueJob(db, chapterId);
+    await runJob(db, job.id, new MockAdapter());
+    const st = await stitchLatest(db, chapterId);
+    expect(st.renderId).toMatch(/^rnd_/);
+    expect(db.select().from(renders).all()).toHaveLength(1);
+    expect(getChapter(db, chapterId)!.status).toBe('done');
+  });
+  test('aktif iş varken Türkçe hata', async () => {
+    const { db, chapterId } = setup();
+    enqueueJob(db, chapterId); // queued bırak
+    await expect(stitchLatest(db, chapterId)).rejects.toThrow(/aktif bir üretim işi/);
+  });
+  test('hiç done segment yoksa Türkçe hata', async () => {
+    const { db, chapterId } = setup(); // script var, üretim yok
+    await expect(stitchLatest(db, chapterId)).rejects.toThrow(/üretilmiş segment yok/);
   });
 });
 

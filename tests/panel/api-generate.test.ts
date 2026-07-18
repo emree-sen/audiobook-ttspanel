@@ -9,10 +9,11 @@ import { createProject } from '@/lib/services/projects';
 import { createChapter } from '@/lib/services/chapters';
 import { importScript, latestScript, listSegments } from '@/lib/services/scripts';
 import { setSetting } from '@/lib/services/settings';
-import { ensureWorker } from '@/lib/services/producer';
+import { enqueueJob, ensureWorker } from '@/lib/services/producer';
 import * as preflightRoute from '@/app/api/chapters/[id]/preflight/route';
 import * as generateRoute from '@/app/api/chapters/[id]/generate/route';
 import * as progressRoute from '@/app/api/chapters/[id]/progress/route';
+import * as stitchRoute from '@/app/api/chapters/[id]/stitch/route';
 import * as resumeRoute from '@/app/api/jobs/[id]/resume/route';
 import * as regenRoute from '@/app/api/segments/[id]/regenerate/route';
 import * as audioRoute from '@/app/api/audio/[...path]/route';
@@ -59,7 +60,7 @@ describe('preflight rotası', () => {
 });
 
 describe('generate + progress + audio', () => {
-  test('kuyrukla + worker bitir + progress done + mp3 servis', async () => {
+  test('kuyrukla + worker bitir + progress done (renderId YOK) + stitch + mp3 servis', async () => {
     const id = mkChapter();
     const res = await generateRoute.POST(jsonReq('POST', {}), ctx({ id }));
     expect(res.status).toBe(202);
@@ -72,8 +73,14 @@ describe('generate + progress + audio', () => {
     expect(body).toContain('event: done');
     const done = JSON.parse(/event: done\ndata: (.*)/.exec(body)![1]);
     expect(done).toMatchObject({ done: 5, total: 5, failedCount: 0 });
+    expect(done.renderId).toBeUndefined();
+    expect(done.renderPath).toBeUndefined();
 
-    const audio = await audioRoute.GET(jsonReq('GET'), ctx({ path: (done.renderPath as string).split('/') }));
+    const st = await stitchRoute.POST(jsonReq('POST'), ctx({ id }));
+    expect(st.status).toBe(200);
+    const { renderPath } = await st.json();
+
+    const audio = await audioRoute.GET(jsonReq('GET'), ctx({ path: (renderPath as string).split('/') }));
     expect(audio.status).toBe(200);
   });
 
@@ -103,14 +110,29 @@ describe('generate + progress + audio', () => {
 });
 
 describe('regenerate rotası', () => {
-  test('başarılı + bilinmeyen segment 400', async () => {
+  test('başarılı (render YOK, {segmentId,status} döner) + bilinmeyen segment 400', async () => {
     const id = mkChapter();
     await generateRoute.POST(jsonReq('POST', {}), ctx({ id }));
     await ensureWorker(db);
     const seg = listSegments(db, latestScript(db, id)!.id)[0];
     const ok = await regenRoute.POST(jsonReq('POST'), ctx({ id: seg.id }));
     expect(ok.status).toBe(200);
-    expect((await ok.json()).renderId).toMatch(/^rnd_/);
+    expect(await ok.json()).toEqual({ segmentId: seg.id, status: 'done' });
     expect((await regenRoute.POST(jsonReq('POST'), ctx({ id: 'seg_yok' }))).status).toBe(400);
+  });
+});
+
+describe('stitch rotası', () => {
+  test('POST /api/chapters/[id]/stitch: render döner; aktif işte 400', async () => {
+    const id = mkChapter();
+    await generateRoute.POST(jsonReq('POST', {}), ctx({ id }));
+    await ensureWorker(db);
+    const ok = await stitchRoute.POST(jsonReq('POST'), ctx({ id }));
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).renderId).toMatch(/^rnd_/);
+
+    enqueueJob(db, id); // yeni iş kuyrukta kalsın (worker çalıştırılmadı) — aktif iş
+    const bad = await stitchRoute.POST(jsonReq('POST'), ctx({ id }));
+    expect(bad.status).toBe(400);
   });
 });

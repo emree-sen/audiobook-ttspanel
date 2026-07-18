@@ -23,7 +23,7 @@ export const chapters = sqliteTable('chapters', {
   narrationStyle: text('narration_style'),
   voiceMode: text('voice_mode').notNull().default('narrator'), // narrator|multi
   maxCharacters: integer('max_characters').notNull().default(6),
-  status: text('status').notNull().default('draft'), // draft|scripted|generating|done|error
+  status: text('status').notNull().default('draft'), // draft|scripted|generating|voiced|done|error
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
