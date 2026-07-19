@@ -76,6 +76,9 @@ export function Sidebar() {
           ))}
           {tree !== null && (
             <>
+              <Link href="/library" className={pathname === '/library' ? 'side-item manage on' : 'side-item manage'}>
+                <Icon name="headphones" size={12} /> Kütüphane
+              </Link>
               <Link href="/" className="side-item manage"><Icon name="plus" size={12} /> Yeni proje</Link>
               <Link href="/settings" className={pathname === '/settings' ? 'side-item manage on' : 'side-item manage'}>
                 <Icon name="gear" size={12} /> Ayarlar
