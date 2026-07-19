@@ -74,17 +74,20 @@ export default function LibraryPage() {
       <h1>Kütüphane {space && <span className="muted" style={{ fontSize: '0.8rem' }}>indirilenler: {space}</span>}</h1>
       {err && <p className="muted" role="alert"><Icon name="warn" size={14} /> {err}</p>}
 
-      {cont && (
-        <div className="card continue">
-          <h2><Icon name="headphones" /> Devam et</h2>
-          <p className="row">
-            <button onClick={() => playChapter(toTrack(cont.s.project.title, cont.c), queueOf(cont.s))}>
-              <Icon name="play" /> {cont.c.title}
-            </button>
-            <span className="muted">{cont.s.project.title} · {fmt(cont.c.progressSec)} / {fmt(cont.c.durationSec)}</span>
-          </p>
-        </div>
-      )}
+      {cont && (() => {
+        const contCurrent = track?.chapterId === cont.c.id;
+        return (
+          <div className="card continue">
+            <h2><Icon name="headphones" /> Devam et</h2>
+            <p className="row">
+              <button onClick={() => (contCurrent ? toggle() : playChapter(toTrack(cont.s.project.title, cont.c), queueOf(cont.s)))}>
+                <Icon name={contCurrent && playing ? 'pause' : 'play'} /> {cont.c.title}
+              </button>
+              <span className="muted">{cont.s.project.title} · {fmt(cont.c.progressSec)} / {fmt(cont.c.durationSec)}</span>
+            </p>
+          </div>
+        );
+      })()}
 
       {lib.length === 0 && !err && (
         <EmptyState icon="headphones" title="Henüz dinlenecek bölüm yok">Bir bölümü üretip birleştirdiğinde burada görünür.</EmptyState>
@@ -109,20 +112,21 @@ export default function LibraryPage() {
                   ) : (
                     <span title={c.status === 'voiced' ? 'Önce Birleştir' : 'Çevrimdışı — indirilmedi'}><Icon name="warn" size={13} /></span>
                   )}
-                  <span className="t">{c.title}</span>
+                  <span className="name">{c.title}</span>
+                  {isCurrent && playing && <span className="eq" aria-hidden="true"><span /><span /><span /><span /><span /></span>}
                   {playable ? (
-                    <>
+                    <span className="tools">
                       <span className="muted mono">{pct != null ? `%${pct}` : ''} {fmt(c.durationSec)}</span>
                       <button className="icon" onClick={() => toggleDownload(c)} disabled={dlBusy !== null}
                         aria-label={dl.has(c.renderPath!) ? 'İndirileni sil' : 'Offline için indir'}
                         title={dl.has(c.renderPath!) ? 'İndirildi — silmek için tıkla' : 'Offline için indir'}>
                         {dlBusy === c.id ? <Icon name="spinner" size={14} /> : <Icon name={dl.has(c.renderPath!) ? 'check' : 'download'} size={14} />}
                       </button>
-                    </>
+                    </span>
                   ) : c.status === 'voiced' ? (
-                    <Link className="muted" href={`/chapters/${c.id}`}>Birleştir bekliyor →</Link>
+                    <span className="tools"><Link className="muted" href={`/chapters/${c.id}`}>Birleştir bekliyor →</Link></span>
                   ) : (
-                    <span className="muted">çevrimdışı — indirilmedi</span>
+                    <span className="tools"><span className="muted">çevrimdışı — indirilmedi</span></span>
                   )}
                 </div>
               );
