@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createDb, type Db } from '@/lib/db/client';
+import { listeningProgress } from '@/lib/db/schema';
 import { createProject } from '@/lib/services/projects';
-import { createChapter, updateChapter } from '@/lib/services/chapters';
+import { createChapter } from '@/lib/services/chapters';
 import { importScript } from '@/lib/services/scripts';
 import { enqueueJob, runJob, stitchLatest } from '@/lib/services/producer';
 import { getLibrary, saveProgress } from '@/lib/services/library';
@@ -60,7 +62,10 @@ describe('saveProgress', () => {
     saveProgress(db, c.id, { positionSec: 20 });
     const row = getLibrary(db)[0].chapters[0];
     expect(row.progressSec).toBe(20);
-    // durationSec tabloda korunur (yanıtta render süresi döner; tablo değeri ayrı sorgulanır)
+    // durationSec tabloda korunur (getLibrary render süresini döner; tablo değeri doğrudan sorgulanır)
+    const stored = db.select().from(listeningProgress).where(eq(listeningProgress.chapterId, c.id)).get()!;
+    expect(stored.positionSec).toBe(20);
+    expect(stored.durationSec).toBe(100); // ikinci çağrı durationSec vermedi — eskisi korunur
   });
   test('bilinmeyen bölüm Türkçe hata', () => {
     expect(() => saveProgress(db, 'chp_yok', { positionSec: 1 })).toThrow(/bulunamadı/i);
