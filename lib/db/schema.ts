@@ -117,3 +117,10 @@ export const voices = sqliteTable('voices', {
   path: text('path'), // yalnız piper: .onnx dosya yolu
   createdAt: integer('created_at').notNull(),
 }, (t) => [uniqueIndex('voices_provider_voice').on(t.provider, t.voice)]);
+
+export const listeningProgress = sqliteTable('listening_progress', {
+  chapterId: text('chapter_id').primaryKey().references(() => chapters.id, { onDelete: 'cascade' }),
+  positionSec: real('position_sec').notNull().default(0),
+  durationSec: real('duration_sec'),
+  updatedAt: integer('updated_at').notNull(),
+});
