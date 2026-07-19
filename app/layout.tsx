@@ -5,6 +5,8 @@ import { JetBrains_Mono, Manrope } from 'next/font/google';
 import { LogoutButton } from '@/lib/ui/LogoutButton';
 import { Sidebar } from '@/lib/ui/Sidebar';
 import { RegisterSw } from '@/lib/ui/player/RegisterSw';
+import { PlayerProvider } from '@/lib/ui/player/PlayerProvider';
+import { PlayerBar } from '@/lib/ui/player/PlayerBar';
 
 const manrope = Manrope({ subsets: ['latin', 'latin-ext'], variable: '--font-manrope' });
 const jbmono = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], variable: '--font-jbmono' });
@@ -17,24 +19,27 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="tr" className={`${manrope.variable} ${jbmono.variable}`}>
       <body>
         <RegisterSw />
-        <header className="topbar">
-          <Link href="/" className="brand">
-            {/* Dalga-formu marka işareti */}
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <rect x="1" y="6" width="2.5" height="6" rx="1.25" fill="currentColor" />
-              <rect x="5" y="3" width="2.5" height="12" rx="1.25" fill="currentColor" />
-              <rect x="9" y="1" width="2.5" height="16" rx="1.25" fill="currentColor" opacity="0.85" />
-              <rect x="13" y="5" width="2.5" height="8" rx="1.25" fill="currentColor" />
-            </svg>
-            webnovel-tts
-          </Link>
-          <span className="spacer" />
-          <LogoutButton />
-        </header>
-        <div className="shell">
-          <Sidebar />
-          <main className="container">{children}</main>
-        </div>
+        <PlayerProvider>
+          <header className="topbar">
+            <Link href="/" className="brand">
+              {/* Dalga-formu marka işareti */}
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <rect x="1" y="6" width="2.5" height="6" rx="1.25" fill="currentColor" />
+                <rect x="5" y="3" width="2.5" height="12" rx="1.25" fill="currentColor" />
+                <rect x="9" y="1" width="2.5" height="16" rx="1.25" fill="currentColor" opacity="0.85" />
+                <rect x="13" y="5" width="2.5" height="8" rx="1.25" fill="currentColor" />
+              </svg>
+              webnovel-tts
+            </Link>
+            <span className="spacer" />
+            <LogoutButton />
+          </header>
+          <div className="shell">
+            <Sidebar />
+            <main className="container">{children}</main>
+          </div>
+          <PlayerBar />
+        </PlayerProvider>
       </body>
     </html>
   );

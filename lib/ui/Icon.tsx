@@ -3,7 +3,8 @@ import type { ReactElement } from 'react';
 export type IconName =
   | 'play' | 'trash' | 'pencil' | 'up' | 'down' | 'plus'
   | 'person' | 'doc' | 'wave' | 'speaker' | 'warn' | 'logout' | 'spinner'
-  | 'chev' | 'menu' | 'folder' | 'gear';
+  | 'chev' | 'menu' | 'folder' | 'gear'
+  | 'pause' | 'next' | 'back15' | 'fwd30' | 'download' | 'check' | 'headphones';
 
 // Saf inline SVG ikon seti — bağımlılık yok; stroke tabanlı, currentColor.
 const paths: Record<IconName, ReactElement> = {
@@ -24,6 +25,13 @@ const paths: Record<IconName, ReactElement> = {
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
   folder: <path d="M1.8 4.5a1 1 0 0 1 1-1h3.4l1.5 1.6h5.5a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />,
   gear: <><circle cx="8" cy="8" r="2.4" /><path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5" /></>,
+  pause: <path d="M5 3v10M11 3v10" strokeWidth="2.4" />,
+  next: <><path d="M4 3.5 10 8l-6 4.5z" fill="currentColor" stroke="none" /><path d="M12 3.5v9" strokeWidth="2" /></>,
+  back15: <><path d="M8 2.8A5.2 5.2 0 1 1 2.8 8" /><path d="M8 0.8 5.4 2.8 8 4.8" fill="currentColor" stroke="none" /><text x="8.2" y="11" fontSize="6.2" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="inherit">15</text></>,
+  fwd30: <><path d="M8 2.8A5.2 5.2 0 1 0 13.2 8" /><path d="M8 0.8 10.6 2.8 8 4.8" fill="currentColor" stroke="none" /><text x="7.8" y="11" fontSize="6.2" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="inherit">30</text></>,
+  download: <><path d="M8 2.5v7M4.8 6.5 8 9.7l3.2-3.2" /><path d="M2.8 12.5h10.4" /></>,
+  check: <path d="M2.8 8.6 6.4 12 13.2 4.4" />,
+  headphones: <><path d="M2.5 9.5a5.5 5.5 0 0 1 11 0" /><rect x="1.8" y="9" width="3" height="4.5" rx="1.2" /><rect x="11.2" y="9" width="3" height="4.5" rx="1.2" /></>,
 };
 
 export function Icon({ name, size = 16, label, className }: { name: IconName; size?: number; label?: string; className?: string }) {
