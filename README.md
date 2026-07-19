@@ -10,7 +10,7 @@ Web novel'leri (ve kendi metinlerini) duygu-duyarlı, çok-sesli seslendiren **s
 - ✅ Üretim hattı: DB-destekli kuyruk (tarayıcı kapansa da sürer), preflight çağrı hesabı + günlük kota göstergesi, kotaya çarpınca duraklat/devam, content-hash önbelleği (değişmeyen segment tekrar TTS'e gitmez), segment başına dinleme + tek-segment yeniden üretme
 - ✅ Sağlayıcı ekosistemi (Dilim C2): OpenAI-uyumlu bağlantılar + Piper lokal TTS, Ayarlar ekranı, sağlayıcı-bazlı ses havuzu, stilsiz sağlayıcılarda otomatik stil düşürme notu
 - ✅ Üretim akışı iyileştirmeleri (Dilim C3): anlatıcı modunda az-segment (paragraf kuralı + birleştirme), script/segment satır düzenleme, ayrı "Birleştir" adımı (segmentler hazır → `voiced` → mp3), TTS süre bekçisi (absürt uzunlukta otomatik yeniden deneme), dev'de çift-worker kota israfı düzeltmesi
-- ⬜ Kütüphane + PWA oynatıcı
+- ✅ Kütüphane + PWA oynatıcı (Dilim D): /library sayfası (devam et + seri listesi + indir/sil), DB'de kaldığı yerden devam, global alt çubuk oynatıcı (MediaSession, 0.75-2x hız, ±15/30 sn, otomatik sonraki bölüm), PWA kurulumu + offline dinleme (service worker)
 
 ## Kurulum
 
@@ -61,6 +61,16 @@ Stil/duygu yönergelerini yalnız Gemini uygular; diğer sağlayıcılarda segme
 3. "Üret" → segment segment TTS. Üretim bitince segmentleri dinleyip düzelt (gerekirse metni değiştirip yeniden üret), ardından **"Birleştir"** ile tek mp3'e dönüştür ve tarayıcıda dinle.
 
 Ücretsiz deneme: `.env`'de `TTS_PROVIDER=mock` ve `LLM_PROVIDER=mock` (API çağrısı yapmaz). Elle JSON script yapıştırma "gelişmiş" bölümünde durur (şema: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md` §6).
+
+## Dinleme (PWA)
+
+Panel aynı zamanda telefonunuzda kurulabilen bir sesli-kitap oynatıcısıdır (Progressive Web App).
+
+- **Telefonda kurulum:** Chrome'da paneli aç → menü → "Ana ekrana ekle". (PWA kurulumu **HTTPS veya localhost** gerektirir; SW yalnız `npm run build && npm start` ile çalışan production build'de kayıt olur, `npm run dev`'de PWA özellikleri kapalıdır.)
+- **Kütüphane / devam et:** Sol menüden **Kütüphane**; en üstte "Devam et" kartı en son dinlediğiniz bölümü kaldığınız yerden açar, altında seriye göre gruplanmış bölüm listesi vardır.
+- **İndir → çevrimdışı dinleme:** Bir bölümü indirin, ardından uçak modunda bile `/library` açılır, indirilen bölümler çalar ve ileri/geri sarma (seek) çalışır. Sil ile indirilen dosya cihazdan kaldırılır ve tahmini alan düşer.
+- **Kontroller:** Alttaki genel oynatıcı çubuğunda çal/duraklat, ±15/30 saniye atlama, 0.75×-2× hız (kalıcı) ve kilit ekranı/bildirim kontrolleri (MediaSession: başlık, seri, çal-duraklat, ileri/geri, sonraki) bulunur. Bölüm bitince sırasıyla sonraki bölüme otomatik geçer.
+- **iOS kısıtı:** iOS Safari'de arka planda çalma ve kilit ekranı kontrolleri sınırlı olabilir (Apple'ın PWA/MediaSession desteği kısıtlı); birincil hedef platform **Android**'dir.
 
 ## Bilinen kısıtlar
 
