@@ -119,10 +119,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onTime = () => setPosition(el.currentTime);
     const onDur = () => setDuration(el.duration || 0);
     const onPlay = () => setPlaying(true);
-    const onPause = () => { setPlaying(false); if (track) saveProgress(track.chapterId, el.currentTime, el.duration || 0); };
+    // Not: track state'i değil trackRef.current okunur — start() senkron olarak trackRef'i günceller,
+    // ama tarayıcının native 'pause' olayı el.src atamasından hemen sonra, React bu efekti yeniden
+    // çalıştırmadan ÖNCE tetiklenebilir. Kapanmış (bayat) track state'i kullanılırsa, yeni parçanın
+    // el.currentTime'ı eski parçanın ilerlemesi olarak yanlışlıkla kaydedilir.
+    const onPause = () => { setPlaying(false); const t = trackRef.current; if (t) saveProgress(t.chapterId, el.currentTime, el.duration || 0); };
     const onEnded = () => {
       setPlaying(false);
-      if (track) saveProgress(track.chapterId, el.duration || el.currentTime, el.duration || 0);
+      const t = trackRef.current;
+      if (t) saveProgress(t.chapterId, el.duration || el.currentTime, el.duration || 0);
       next();
     };
     el.addEventListener('timeupdate', onTime);
@@ -130,8 +135,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     el.addEventListener('play', onPlay);
     el.addEventListener('pause', onPause);
     el.addEventListener('ended', onEnded);
-    const tick = setInterval(() => { if (track && !el.paused) saveProgress(track.chapterId, el.currentTime, el.duration || 0); }, 5000);
-    const onHide = () => { if (document.visibilityState === 'hidden' && track) saveProgress(track.chapterId, el.currentTime, el.duration || 0); };
+    const tick = setInterval(() => { const t = trackRef.current; if (t && !el.paused) saveProgress(t.chapterId, el.currentTime, el.duration || 0); }, 5000);
+    const onHide = () => { const t = trackRef.current; if (document.visibilityState === 'hidden' && t) saveProgress(t.chapterId, el.currentTime, el.duration || 0); };
     document.addEventListener('visibilitychange', onHide);
     return () => {
       el.removeEventListener('timeupdate', onTime);
@@ -142,7 +147,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       clearInterval(tick);
       document.removeEventListener('visibilitychange', onHide);
     };
-  }, [track, next, saveProgress]);
+  }, [next, saveProgress]); // track kaldırıldı: gövde artık trackRef.current okuyor, state değişince yeniden kaydolmaya gerek yok
 
   // MediaSession: kilit ekranı metadata + kontroller.
   useEffect(() => {
