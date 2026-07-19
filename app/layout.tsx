@@ -4,16 +4,19 @@ import type { ReactNode } from 'react';
 import { JetBrains_Mono, Manrope } from 'next/font/google';
 import { LogoutButton } from '@/lib/ui/LogoutButton';
 import { Sidebar } from '@/lib/ui/Sidebar';
+import { RegisterSw } from '@/lib/ui/player/RegisterSw';
 
 const manrope = Manrope({ subsets: ['latin', 'latin-ext'], variable: '--font-manrope' });
 const jbmono = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], variable: '--font-jbmono' });
 
-export const metadata = { title: 'webnovel-tts panel' };
+export const metadata = { title: 'webnovel-tts panel', manifest: '/manifest.webmanifest' };
+export const viewport = { themeColor: '#0f1115' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr" className={`${manrope.variable} ${jbmono.variable}`}>
       <body>
+        <RegisterSw />
         <header className="topbar">
           <Link href="/" className="brand">
             {/* Dalga-formu marka işareti */}

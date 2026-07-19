@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE_NAME, verifyToken } from './lib/auth';
 
-const PUBLIC = [/^\/login$/, /^\/api\/auth\//];
+const PUBLIC = [/^\/login$/, /^\/api\/auth\//, /^\/manifest\.webmanifest$/, /^\/sw\.js$/, /^\/icons\//];
 
 export async function middleware(req: NextRequest) {
   const secret = process.env.PANEL_PASSWORD;
