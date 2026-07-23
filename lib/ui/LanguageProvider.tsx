@@ -8,6 +8,7 @@ export function LanguageProvider({ initialLang, children }: { initialLang: Lang;
   const [lang, setLangState] = useState<Lang>(initialLang);
   const setLang = useCallback((l: Lang) => {
     document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; SameSite=Lax`;
+    document.documentElement.lang = l;
     setLangState(l);
   }, []);
   return <Ctx.Provider value={{ lang, setLang }}>{children}</Ctx.Provider>;

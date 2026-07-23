@@ -1,4 +1,4 @@
-// webnovel-tts service worker — elle yazılmış (workbox yok).
+// audiobook-ttspanel service worker — elle yazılmış (workbox yok).
 // VERSION, istemcideki lib/ui/player/offline.ts AUDIO_CACHE sabitiyle eşleşmeli (wnt-v1-audio).
 const VERSION = 'wnt-v1';
 const AUDIO = `${VERSION}-audio`;
