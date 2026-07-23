@@ -1,86 +1,90 @@
-# CLAUDE.md — Proje Durumu ve Rehber
+# CLAUDE.md — Proje Rehberi
 
-> Bu dosya, projeyi devralan her oturum (ve farklı cihaz) için tek kaynak. Yerel Claude hafızası cihazlar arası taşınmaz; kalıcı durum burada.
+> Devralan her oturum (ve farklı cihaz) için tek kaynak. Burada kurallar, kararlar ve
+> kritik kısıtlar durur; işin geçmişi `docs/superpowers/` spec/plan dosyaları ile git
+> geçmişindedir.
 
 ## Proje nedir
 
-Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-sesli** seslendiren, üretim hattı panelli + PWA oynatıcılı, kendi VPS'inde barınan bir **sesli-kitap üretim & dinleme sistemi.**
+Web novel'leri (ve kullanıcının kendi metinlerini) **duygu-duyarlı, çok-sesli**
+seslendiren, üretim hattı panelli + PWA oynatıcılı, self-host bir **sesli-kitap üretim
+& dinleme sistemi.** Akış: ham bölüm metni → panel içi LLM annotation → JSON
+seslendirme scripti (segment + konuşan + duygu/stil + ses) → TTS + birleştirme →
+dinleme. Elle JSON yapıştırma fallback (aynı şema sözleşme).
 
-**Kilit iş bölümü:** Ham bölüm metni → **panel içinde LLM annotation** (Dilim B: Gemini, provider-agnostic adapter) yapılandırılmış bir JSON "seslendirme scripti" üretir (segment + konuşan + duygu/stil + ses) → sistem TTS + birleştirme + oynatma yapar. Elle JSON yapıştırma fallback olarak durur (aynı JSON şeması sözleşme).
+## Çalışma kuralları
 
-## Kullanıcı tercihleri (önemli)
-
-- İletişim **Türkçe**. Kullanıcı: **"sor, kendin karar verme"** — tasarım/kapsam kararlarını tek taraflı alma; seçenekleri sun, o karar versin.
-- Ucuz/pratik çözümler; astronomik API fiyatlarından kaçın; **ücretsiz Google kredisini** kullan.
-- Projeler `C:/RN/` altında (bu repo: `C:/RN/webnovel-tts`).
-- **Prototip için tek anlatıcı ses** yeterli (çoklu ses mimaride destekli ama şimdilik ertelendi — `--single-voice` bayrağı).
+- İletişim **Türkçe**. Kullanıcı: **"sor, kendin karar verme"** — tasarım/kapsam
+  kararlarını tek taraflı alma; seçenekleri sun, o karar versin.
+- Ucuz/pratik çözümler; astronomik API fiyatlarından kaçın; ücretsiz kotaları kullan.
+- **README paritesi:** `README.md` (EN) ana, `README.tr.md` birebir çeviri. README
+  içeriğine dokunan her iş İKİ dosyayı birden günceller.
+- `scripts/` git-ignore'da (telifli kaynak metin içerebilir); bölüm scriptleri lokal
+  kalır. Veri `./data/` (git-ignore).
+- Repo public, BYO-key; lisans MIT.
+- Prototip için tek anlatıcı ses yeterli (çoklu ses destekli; `--single-voice`).
 
 ## Temel kararlar
 
 | Konu | Karar |
 |---|---|
-| Barındırma | **Self-host**: Next.js + SQLite (Drizzle) + yerel disk; tek-sahip auth (PANEL_PASSWORD). Public repo, BYO-key. ~~Supabase Cloud~~ (2026-07-16'da değişti) |
+| Barındırma | **Self-host**: Next.js + SQLite (Drizzle) + yerel disk; tek-sahip auth (PANEL_PASSWORD) |
 | Dil | Türkçe birincil, İngilizce ikincil |
-| TTS motoru | **Gemini 3.1 Flash TTS Preview** (`gemini-3.1-flash-tts-preview`) — bake-off'ta seçildi (2.5 robotik bulundu) |
-| Adapter | **Provider-agnostic** (Chirp 3 HD / Azure / ElevenLabs swappable) |
-| İstemci | Responsive web + **PWA** (panel + oynatıcı tek kod) |
-| Analiz akışı | Panel: raw_text → **LLM annotation panel içinde otomatik** (provider-agnostic, Dilim B) → script; elle JSON yapıştırma da destekli |
-| TTS sağlayıcıları | Gemini + OpenAI-uyumlu bağlantılar + Piper lokal + Mock; global tek aktif sağlayıcı; ayarlar panel içinden |
+| TTS motoru | **Gemini 3.1 Flash TTS Preview** (bake-off'ta seçildi; 2.5 robotik bulundu) |
+| Adapter | Provider-agnostic (Gemini + OpenAI-uyumlu + Piper + Mock; Chirp/Azure/ElevenLabs eklenebilir) |
+| İstemci | Responsive web + PWA (panel + oynatıcı tek kod) |
+| Analiz akışı | raw_text → panel içi LLM annotation (provider-agnostic) → script; elle JSON da destekli |
 
-## Ne yapıldı / ne kaldı
+## Durum
 
-- ✅ **Plan ① — Audio Core + Bake-off CLI**: saf TS çekirdek — zod şema, TTS adapter (Gemini + Mock), ffmpeg birleştirme, orkestratör, CLI. 23 test yeşil.
-- ✅ **Dilim A — Panel iskeleti + veri katmanı + dikey dilim** (`docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-a.md`): Next.js panel, SQLite (Drizzle), tek-sahip auth, proje/bölüm CRUD, elle script import, mock/gemini ile üretim + SSE ilerleme + dinleme.
-- ✅ **Dilim B — LLM annotation** (`docs/superpowers/specs/2026-07-16-panel-slice-b-llm-annotation-design.md`, plan: `docs/superpowers/plans/2026-07-16-panel-slice-b-llm-annotation.md`): provider-agnostic LLM adapter (Gemini + Mock), ses modu (tek anlatıcı / çok karakterli + maks. karakter), chunk'lama + zod-retry, ses havuzundan otomatik atama, ek talimatla yeniden üretme, cast ses düzeltme, usage/token kaydı.
-- ✅ **UI Redesign — koyu stüdyo** (`docs/superpowers/specs/2026-07-17-panel-ui-redesign-design.md`): token sistemi, Manrope+JetBrains Mono (next/font), dalga-formu marka + eşitleyici animasyon, inline SVG ikonlar, ConfirmButton/EmptyState, 4 sayfa yeniden giydirildi. Davranış/API değişmedi.
-- ✅ **Dilim C1 — Üretim hattı** (`docs/superpowers/specs/2026-07-17-panel-slice-c1-production-line-design.md`, plan: `docs/superpowers/plans/2026-07-17-panel-slice-c1-production-line.md`): jobs/tts_calls/audio_cache tabloları, preflight çağrı+kota hesabı, DB-destekli kuyruk (duraklat/devam, restart toparlama), content-hash cache, segment dosyaları + tek-segment yeniden üretme, progress SSE izleyici.
-- ✅ **Dilim C2 — Sağlayıcı ekosistemi** (spec: docs/superpowers/specs/2026-07-17-panel-slice-c2-provider-ecosystem-design.md, plan: docs/superpowers/plans/2026-07-18-panel-slice-c2-provider-ecosystem.md): OpenAI-uyumlu adlandırılmış bağlantılar + Piper lokal adapter (kullanıcı kurulumlu), /settings ekranı (anahtarlar DB+env, maskeli), DB-tabanlı sağlayıcı-bazlı ses havuzu, yetenek bildirimi (stilsiz sağlayıcıda stil düşürme + not).
-- ✅ **Dilim C3 — Üretim akışı iyileştirmeleri** (spec: `docs/superpowers/specs/2026-07-18-panel-slice-c3-production-flow-design.md`, plan: `docs/superpowers/plans/2026-07-18-panel-slice-c3-production-flow.md`): narrator modunda az-segment (prompt + mergeSegments), script JSON + segment satır düzenleme, ayrı "Birleştir" adımı (`voiced` durumu, regen otomatik stitch yapmaz), **KN1** TTS süre bekçisi (model tekrar arızası), **KN2** worker tekilliği (globalThis + atomik iş sahiplenme — dev'de kota 2x yanma bug'ı).
-- ✅ **Dilim D — Kütüphane + PWA oynatıcı** (spec: docs/superpowers/specs/2026-07-19-panel-slice-d-library-pwa-player-design.md, plan: docs/superpowers/plans/2026-07-19-panel-slice-d-library-pwa-player.md): /library sayfası (devam et + seri listesi + indir/sil), listening_progress ile DB resume, global alt çubuk oynatıcı (MediaSession, 0.75-2x hız, ±15/30 sn, otomatik sonraki), manifest + SVG ikon + elle yazılmış sw.js (audio cache-first + Range→206, offline kütüphane kabuğu), middleware PUBLIC: manifest/sw/icons.
+Plan ① (audio core + CLI) ve Dilim A→D + UI redesign tamam; panel uçtan uca çalışıyor.
+Detaylar:
+
+- Plan ①: `docs/superpowers/plans/2026-07-13-milestone-0-audio-core.md`
+- Dilim A (panel iskeleti): `docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`
+- Dilim B (LLM annotation): `docs/superpowers/specs/2026-07-16-panel-slice-b-llm-annotation-design.md`
+- UI redesign (koyu stüdyo): `docs/superpowers/specs/2026-07-17-panel-ui-redesign-design.md`
+- Dilim C1 (üretim hattı): `docs/superpowers/specs/2026-07-17-panel-slice-c1-production-line-design.md`
+- Dilim C2 (sağlayıcı ekosistemi): `docs/superpowers/specs/2026-07-17-panel-slice-c2-provider-ecosystem-design.md`
+- Dilim C3 (üretim akışı): `docs/superpowers/specs/2026-07-18-panel-slice-c3-production-flow-design.md`
+- Dilim D (kütüphane + PWA): `docs/superpowers/specs/2026-07-19-panel-slice-d-library-pwa-player-design.md`
+- Public repo cilası (README/LICENSE): `docs/superpowers/specs/2026-07-20-public-repo-readme-design.md`
 
 ## Nasıl çalıştırılır
-
-### Panel
 
 ```bash
 npm install
 cp .env.example .env   # GEMINI_API_KEY + PANEL_PASSWORD
-npm run dev            # http://localhost:3000  (test: TTS_PROVIDER=mock)
-npm test               # vitest (çekirdek + panel testleri)
+npm run dev            # http://localhost:3000  (ücretsiz test: TTS_PROVIDER=mock, LLM_PROVIDER=mock)
+npm test               # vitest
 ```
 
-Veri: `./data/` (SQLite `app.db` + `audio/`); git-ignore'da.
+CLI: `npx tsx src/cli/generate.ts <script.json> --out ./out --provider gemini|mock`
+(`--single-voice gemini:Charon`, `--model …`). Doğrulanmış Gemini sesleri: Charon,
+Algieba, Algenib, Leda, Schedar, Puck, Kore, Iapetus…
 
-### CLI
+## Kritik kısıtlar
 
-```bash
-# .env oluştur:  GEMINI_API_KEY=<anahtar>
-# Bir JSON scriptten mp3 üret:
-npx tsx src/cli/generate.ts <script.json> --out ./out --provider gemini
-# Tek anlatıcı sesle (prototip):
-npx tsx src/cli/generate.ts <script.json> --out ./out --provider gemini --single-voice gemini:Charon
-# Ücretsiz/maliyetsiz test:
-npx tsx src/cli/generate.ts <script.json> --out ./out --provider mock
-# Model değiştir: --model gemini-2.5-flash-preview-tts
-```
-
-- JSON seslendirme scripti şeması: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md` §6.
-- Gemini prebuilt sesler (doğrulanmış çalışan): Charon, Algieba, Algenib, Leda, Schedar, Puck, Kore, Iapetus...
-- **`scripts/` git-ignore** (telifli kaynak metin içerebilir). Bölüm scriptleri lokal kalır.
-
-## Bilinen kısıtlar / bulgular (KRİTİK)
-
-1. **GÜNLÜK KOTA (RPD) — EN KRİTİK BLOKER:** `gemini-3.1-flash-tts` modelinde **günde 100 istek** hard limit (429 metric: `generate_requests_per_model_per_day`, limit 100, per project per model). Bu **free-tier** limiti — kullanıcının 'prepay' key'i + Google free-trial kredisi bu per-model günlük kotayı **YÜKSELTMİYOR** (free-trial Cloud kredisidir, AI Studio Gemini API tier'ını değiştirmez). Sonuç: şu an günde **~1 bölüm** (87 segment) ancak; hacim (Faz 2) imkansız. Bir bölüm bile bugünkü test çağrılarıyla birleşince yarıda kaldı (40/87). **Çözümler:** (a) **Gemini API projesinde gerçek faturalama/billing aç** → paid tier RPD binlerce olur (asıl çözüm); (b) hacim için **Cloud TTS Chirp 3 HD** (karakter-bazlı, ayrı & yüksek kota, Cloud kredisi geçerli) veya Vertex — ayrı adapter gerektirir; (c) günlük reset sonrası (00:00 PT) temiz bir çalıştırma <100 segment bölümü tek seferde yapar. Ek olarak RPM için adapter'da throttle (6s) + stilli→düz fallback + segment-atla dayanıklılığı var. GÜNCELLEME (C1): panel artık preflight + kota defteri + duraklat/devam ile bu limiti yönetiyor; faturalama/Chirp kararı C2 ile birlikte. GÜNCELLEME (C2): hacim için artık faturasız alternatifler panelde: Piper (lokal, bedava) veya OpenAI-uyumlu lokal sunucular; Chirp adapter'ı istenirse ileride ayrı iş. GÜNCELLEME (C3): dev'de çift-worker kota 2x yakma bug'ı kapatıldı (atomik iş sahiplenme).
-2. **Kırılgan stil prompt'ları:** Bazı stil talimatları modeli sessizce boş yanıta itiyor (preview, non-deterministik). Adapter'da **stilli → düz metin fallback** var (o segment stilsiz de olsa ses üretilir). GÜNCELLEME (C3): model bazen stilli kısa segmentlerde metni tekrarlayıp uzun sessizlik üretiyor; panel süre bekçisi (250 ms/karakter, min 4 sn) absürt çıktıda 1 kez yeniden deneyip kısa sonucu kullanıyor. Sorun sürerse segment "düzenle/yeniden üret" ile elle çözülür.
-3. **Türkçe doğallık:** ampirik doğrulandı (3.1 kabul); adapter swappable olduğundan gerekirse Chirp/Azure denenebilir.
+1. **Gemini TTS günlük kota (RPD):** free tier'da model başına **~100 istek/gün**
+   (429: `generate_requests_per_model_per_day`). Prepay/Cloud kredisi bu limiti
+   YÜKSELTMEZ; gerçek billing gerekir. Panel yönetiyor: preflight + kota defteri +
+   duraklat/devam; hacim için faturasız alternatif Piper / OpenAI-uyumlu lokal.
+   Faturalama açılırsa `quota_limit_gemini` ayarı yükseltilir. (Chirp 3 HD adapter'ı
+   ileriye dönük seçenek.)
+2. **Kırılgan stil prompt'ları:** bazı stiller modeli boş yanıta/uzun sessizliğe
+   itebiliyor. Adapter'da stilli→düz fallback; panelde süre bekçisi (250 ms/karakter,
+   min 4 sn, 1 yeniden deneme). Sürerse segment elle düzenlenip yeniden üretilir.
+3. **Türkçe doğallık:** 3.1 ampirik kabul; adapter swappable, gerekirse Chirp/Azure.
 
 ## Belgeler
 
-- Tasarım/spec: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md`
-- TTS araştırması (kaynaklı): `docs/research/2026-07-13-tts-provider-research.md`
-- Bake-off notları/karar: `docs/research/bakeoff-notes.md`
-- Plan ①: `docs/superpowers/plans/2026-07-13-milestone-0-audio-core.md`
+- Ana tasarım/spec: `docs/superpowers/specs/2026-07-13-webnovel-tts-design.md`
+  (JSON script şeması §6)
+- TTS araştırması: `docs/research/2026-07-13-tts-provider-research.md`
+- Bake-off kararı: `docs/research/bakeoff-notes.md`
 
-## Sonraki oturum için öneri
+## Backlog (kullanıcıyla önceliklendir)
 
-Ana dilimler tamam (A→D). Backlog adayları: VPS'e kurulum + HTTPS (PWA için şart), Gemini faturalama kararı / Chirp adapter'ı, cache & renders GC, ses önizleme düğmesi, uyku zamanlayıcısı, PNG manifest ikonları (eski Android), stitchLatest hata metni cilası. Kullanıcıyla önceliklendirin.
+VPS kurulumu + HTTPS (PWA şartı), Gemini faturalama kararı / Chirp adapter'ı,
+cache & renders GC, ses önizleme düğmesi, uyku zamanlayıcısı, PNG manifest ikonları
+(eski Android), stitchLatest hata metni cilası.
