@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/lib/ui/Icon';
 import { ConfirmButton } from '@/lib/ui/ConfirmButton';
 import { useLang, useT } from '@/lib/ui/LanguageProvider';
+import { setupStatus } from '@/lib/ui/setup-status';
 
 type VoiceRow = { id: string; provider: string; voice: string; gender: string; tone: string; path: string | null };
 type Conn = { id: string; label: string; baseUrl: string; model: string; hasKey: boolean };
@@ -72,6 +73,19 @@ function VoicePool({ provider, rows, withPath, reload, onError }: {
   );
 }
 
+// Üst seviye bileşen (SettingsPage İÇİNDE TANIMLAMA — iç içe bileşen her render'da remount olur, state kaybedilir).
+function QuickSetupRow({ ok, label, hint, target, go }: { ok: boolean; label: string; hint: string; target: string; go: (id: string) => void }) {
+  const t = useT();
+  return (
+    <div className="rowitem">
+      <span aria-hidden>{ok ? '✓' : '—'}</span>
+      <span>{label}</span>
+      <span className="muted">{hint}</span>
+      {!ok && <button className="ghost" onClick={() => go(target)}>{t('settings.quickGo')}</button>}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const t = useT();
   const { lang, setLang } = useLang();
@@ -87,6 +101,8 @@ export default function SettingsPage() {
   const [probeMsg, setProbeMsg] = useState<Record<string, string>>({}); // anahtar: 'llm' | bağlantı id'si
   const [detected, setDetected] = useState<Record<string, boolean>>({});
   const [xtts, setXtts] = useState<{ state: string; log: string[]; exitInfo: string; voices: string[] }>({ state: 'stopped', log: [], exitInfo: '', voices: [] });
+  const [llmModels, setLlmModels] = useState<string[]>([]);
+  const [xttsFiles, setXttsFiles] = useState<string[]>([]);
 
   const refreshXtts = useCallback(async () => {
     const res = await fetch('/api/xtts');
@@ -99,9 +115,16 @@ export default function SettingsPage() {
     return () => clearInterval(id);
   }, [xtts.state, refreshXtts]);
 
+  const refreshXttsFiles = useCallback(async () => {
+    const res = await fetch('/api/xtts/voices');
+    if (res.ok) setXttsFiles((await res.json()).voices ?? []);
+  }, []);
+  useEffect(() => { refreshXttsFiles(); }, [refreshXttsFiles]);
+
   async function probe(kind: 'llm' | 'tts', baseUrl: string, msgKey: string) {
     const res = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, baseUrl }) });
     const d = await res.json().catch(() => ({ ok: false, detail: '?' }));
+    if (d.models) setLlmModels(d.models);
     setProbeMsg((m) => ({ ...m, [msgKey]: `${d.ok ? '✓' : '✗'} ${d.detail}` }));
     return !!d.ok;
   }
@@ -155,6 +178,28 @@ export default function SettingsPage() {
 
   async function delConnection(id: string) { setErr(''); await fetch(`/api/connections/${id}`, { method: 'DELETE' }); await load(); }
 
+  async function setupXtts() {
+    setErr('');
+    const cur = data;
+    if (!cur) return;
+    if (!cur.connections.some((c) => c.id === 'xtts')) {
+      const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl: 'http://localhost:8020/v1', model: 'xtts-v2' }) });
+      if (!res.ok) { setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.connectionAddError')); return; }
+    }
+    await put({ provider: 'xtts' }); // aktif sağlayıcıyı da geçir — yeni kullanıcı tuzağı #2
+    const pr = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'tts', baseUrl: 'http://localhost:8020/v1' }) });
+    const d = await pr.json().catch(() => ({ ok: false, detail: '?', voices: [] as string[] }));
+    if (d.ok) {
+      const fresh: SettingsData = await (await fetch('/api/settings')).json(); // eşitleme öncesi güncel havuz (stale state'e karşı)
+      const have = new Set((fresh.voices.xtts ?? []).map((v) => v.voice));
+      for (const v of (d.voices ?? []) as string[]) {
+        if (!have.has(v)) await fetch('/api/voices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'xtts', voice: v }) });
+      }
+    }
+    setProbeMsg((m) => ({ ...m, xtts: `${d.ok ? '✓' : '✗'} ${d.detail}` }));
+    await load();
+  }
+
   if (data === null) return <p className="muted">{t('common.loading')}</p>;
 
   const providerOptions = [
@@ -163,6 +208,10 @@ export default function SettingsPage() {
     ...data.connections.map((c) => ({ value: c.id, label: t('settings.connectionOpenaiCompatible', { label: c.label }) })),
     { value: 'mock', label: t('settings.mockTest') },
   ];
+
+  const s = setupStatus(data);
+  const poolTarget = data.provider === 'gemini' ? 'card-gemini' : data.provider === 'piper' ? 'card-piper' : 'card-connections';
+  const goToCard = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
   return (
     <>
@@ -178,7 +227,17 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" id="quick-setup">
+        <h2><Icon name="doc" /> {t('settings.quickHeading')}</h2>
+        <div className="rows">
+          <QuickSetupRow ok={s.llm} label={t('settings.quickLlm')} hint={t('settings.quickLlmHint')} target="card-llm" go={goToCard} />
+          <QuickSetupRow ok={s.tts} label={t('settings.quickTts')} hint={t('settings.quickTtsHint')} target="card-tts" go={goToCard} />
+          <QuickSetupRow ok={s.pool} label={t('settings.quickPool')} hint={t('settings.quickPoolHint')} target={poolTarget} go={goToCard} />
+        </div>
+        {s.llm && s.tts && s.pool && <p className="muted">{t('settings.quickReady')}</p>}
+      </div>
+
+      <div className="card" id="card-tts">
         <h2><Icon name="speaker" /> {t('settings.activeProviderHeading')}</h2>
         <p className="row">
           <select value={data.provider} onChange={(e) => put({ provider: e.target.value })} aria-label={t('settings.activeProviderAria')}>
@@ -187,7 +246,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="card">
+      <div className="card" id="card-gemini">
         <h2><Icon name="wave" /> Gemini</h2>
         <div className="rows">
           <div className="rowitem">
@@ -212,7 +271,7 @@ export default function SettingsPage() {
         <VoicePool provider="gemini" rows={data.voices.gemini ?? []} reload={load} onError={setErr} />
       </div>
 
-      <div className="card">
+      <div className="card" id="card-connections">
         <h2><Icon name="doc" /> {t('settings.connectionsHeading')}</h2>
         {data.connections.length === 0 && <p className="muted">{t('settings.connectionsEmpty')}</p>}
         {data.connections.map((c) => (
@@ -233,15 +292,10 @@ export default function SettingsPage() {
           </details>
         ))}
         <div className="row">
-          <button type="button" className="ghost" disabled={data.connections.some((c) => c.id === 'xtts')}
-            onClick={async () => {
-              setErr('');
-              const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl: 'http://localhost:8020/v1', model: 'xtts-v2' }) });
-              if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.connectionAddError'));
-              await load();
-            }}>
-            <Icon name="plus" /> {t('settings.xttsPresetButton')} {detected.xtts && <span className="badge">{t('settings.detectedBadge')}</span>}
+          <button type="button" className="ghost" onClick={setupXtts}>
+            <Icon name="plus" /> {data.connections.some((c) => c.id === 'xtts') ? t('settings.xttsSyncVoices') : t('settings.xttsPresetButton')} {detected.xtts && <span className="badge">{t('settings.detectedBadge')}</span>}
           </button>
+          {probeMsg.xtts && <span className="muted">{probeMsg.xtts}</span>}
           <span className="muted">{t('settings.presetHint')}</span>
         </div>
         <form className="row wrap" onSubmit={(e) => { e.preventDefault(); addConnection(); }}>
@@ -253,7 +307,7 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card" id="card-piper">
         <h2><Icon name="speaker" /> {t('settings.piperLocal')}</h2>
         <form className="row" onSubmit={async (e) => { e.preventDefault(); await put({ piperExe: piperInput.trim() }); }}>
           <input value={piperInput} onChange={(e) => setPiperInput(e.target.value)} placeholder="C:\piper\piper.exe" />
@@ -263,7 +317,7 @@ export default function SettingsPage() {
         <VoicePool provider="piper" rows={data.voices.piper ?? []} withPath reload={load} onError={setErr} />
       </div>
 
-      <div className="card">
+      <div className="card" id="card-xtts">
         <h2><Icon name="speaker" /> {t('settings.xttsHeading')}</h2>
         <div className="row">
           {xtts.state === 'stopped' || xtts.state === 'error' ? (
@@ -290,6 +344,25 @@ export default function SettingsPage() {
           <pre className="mono muted" style={{ maxHeight: '8rem', overflow: 'auto', fontSize: '0.75rem' }}>{xtts.log.slice(-12).join('\n')}</pre>
         )}
         <p className="muted">{t('settings.xttsHint')}</p>
+        <div className="rows">
+          {xttsFiles.map((f) => (
+            <div key={f} className="rowitem">
+              <span className="mono">{f}</span>
+              <ConfirmButton onConfirm={async () => { await fetch(`/api/xtts/voices/${encodeURIComponent(f)}`, { method: 'DELETE' }); await refreshXttsFiles(); }} ariaLabel={t('settings.deleteVoice')} />
+            </div>
+          ))}
+          <input type="file" accept=".wav" aria-label={t('settings.xttsUploadAria')} onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setErr('');
+            const fd = new FormData(); fd.append('file', f);
+            const res = await fetch('/api/xtts/voices', { method: 'POST', body: fd });
+            if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.saveError'));
+            e.target.value = '';
+            await refreshXttsFiles(); await load();
+          }} />
+          <p className="muted">{t('settings.xttsVoicesHint')}</p>
+        </div>
       </div>
 
       <div className="card">
@@ -316,7 +389,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" id="card-llm">
         <h2><Icon name="doc" /> {t('settings.llmHeading')}</h2>
         <div className="row">
           <select value={data.llmProvider} onChange={(e) => put({ llmProvider: e.target.value })} aria-label={t('settings.llmProviderAria')}>
@@ -339,6 +412,12 @@ export default function SettingsPage() {
           <button type="button" className="ghost" onClick={() => probe('llm', llmBaseInput.trim() || 'http://localhost:1234/v1', 'llm')}>{t('settings.probeButton')}</button>
           {probeMsg.llm && <span className="muted">{probeMsg.llm}</span>}
         </div>
+        {llmModels.length > 0 && (
+          <select aria-label={t('settings.llmProviderAria')} value="" onChange={async (e) => { const v = e.target.value; if (v) { setLlmModelInput(v); await put({ llmModel: v }); } }}>
+            <option value="">{t('settings.llmModelPick')}</option>
+            {llmModels.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        )}
         {data.llmProvider === 'openai-compat' && (
           <>
             <form className="row" onSubmit={async (e) => {
