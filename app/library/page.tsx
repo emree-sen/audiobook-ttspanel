@@ -5,7 +5,7 @@ import { Icon } from '@/lib/ui/Icon';
 import { EmptyState } from '@/lib/ui/EmptyState';
 import { usePlayer, type PlayerTrack } from '@/lib/ui/player/PlayerProvider';
 import { audioUrl, downloadChapter, downloadedSet, removeDownload, storageEstimateText } from '@/lib/ui/player/offline';
-import { useT } from '@/lib/ui/LanguageProvider';
+import { useLang, useT } from '@/lib/ui/LanguageProvider';
 
 type LibChapter = { id: string; title: string; position: number; status: string; renderPath: string | null; durationSec: number | null; progressSec: number | null; progressUpdatedAt: number };
 type LibSeries = { project: { id: string; title: string }; chapters: LibChapter[] };
@@ -23,6 +23,7 @@ const toTrack = (seriesTitle: string, c: LibChapter): PlayerTrack => ({
 
 export default function LibraryPage() {
   const t = useT();
+  const { lang } = useLang();
   const [lib, setLib] = useState<LibSeries[] | null>(null);
   const [err, setErr] = useState('');
   const [dl, setDl] = useState<Set<string>>(new Set());
@@ -118,7 +119,7 @@ export default function LibraryPage() {
                   {isCurrent && playing && <span className="eq" aria-hidden="true"><span /><span /><span /><span /><span /></span>}
                   {playable ? (
                     <span className="tools">
-                      <span className="muted mono">{pct != null ? `%${pct}` : ''} {fmt(c.durationSec)}</span>
+                      <span className="muted mono">{pct != null ? (lang === 'tr' ? `%${pct}` : `${pct}%`) : ''} {fmt(c.durationSec)}</span>
                       <button className="icon" onClick={() => toggleDownload(c)} disabled={dlBusy !== null}
                         aria-label={dl.has(c.renderPath!) ? t('library.deleteDownload') : t('library.download')}
                         title={dl.has(c.renderPath!) ? t('library.downloadedTapToDelete') : t('library.download')}>
