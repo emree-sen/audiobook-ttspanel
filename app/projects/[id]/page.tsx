@@ -6,11 +6,13 @@ import { Icon } from '@/lib/ui/Icon';
 import { ConfirmButton } from '@/lib/ui/ConfirmButton';
 import { EmptyState } from '@/lib/ui/EmptyState';
 import { refreshTree } from '@/lib/ui/refresh';
+import { useT } from '@/lib/ui/LanguageProvider';
 
 type Chapter = { id: string; title: string; position: number; status: string };
 type Detail = { project: { id: string; title: string }; chapters: Chapter[] };
 
 export default function ProjectPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [title, setTitle] = useState('');
@@ -43,18 +45,18 @@ export default function ProjectPage() {
     refreshTree(); load();
   }
 
-  if (!detail) return <p className="muted">Yükleniyor…</p>;
+  if (!detail) return <p className="muted">{t('common.loading')}</p>;
   return (
     <>
       <div className="crumbs">
-        <Link href="/">Projeler</Link>
+        <Link href="/">{t('home.title')}</Link>
         <span className="sep">›</span>
         <span className="here">{detail.project.title}</span>
       </div>
       <h1>{detail.project.title}</h1>
       <form onSubmit={create} className="row">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Yeni bölüm adı" style={{ maxWidth: '20rem' }} />
-        <button type="submit"><Icon name="plus" /> Ekle</button>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('project.newChapterPlaceholder')} style={{ maxWidth: '20rem' }} />
+        <button type="submit"><Icon name="plus" /> {t('common.add')}</button>
       </form>
 
       {detail.chapters.length > 0 && (
@@ -65,9 +67,9 @@ export default function ProjectPage() {
               <Link href={`/chapters/${c.id}`} className="name">{c.title}</Link>
               <span className={`badge ${c.status}`}>{c.status}</span>
               <span className="tools">
-                <button className="icon" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Yukarı taşı" title="Yukarı taşı"><Icon name="up" /></button>
-                <button className="icon" onClick={() => move(i, 1)} disabled={i === detail.chapters.length - 1} aria-label="Aşağı taşı" title="Aşağı taşı"><Icon name="down" /></button>
-                <ConfirmButton onConfirm={() => remove(c.id)} ariaLabel="Bölümü sil" />
+                <button className="icon" onClick={() => move(i, -1)} disabled={i === 0} aria-label={t('common.moveUp')} title={t('common.moveUp')}><Icon name="up" /></button>
+                <button className="icon" onClick={() => move(i, 1)} disabled={i === detail.chapters.length - 1} aria-label={t('common.moveDown')} title={t('common.moveDown')}><Icon name="down" /></button>
+                <ConfirmButton onConfirm={() => remove(c.id)} ariaLabel={t('project.deleteChapter')} />
               </span>
             </div>
           ))}
@@ -75,7 +77,7 @@ export default function ProjectPage() {
       )}
 
       {detail.chapters.length === 0 && (
-        <EmptyState icon="doc" title="Henüz bölüm yok">İlk bölümü yukarıdaki alandan ekle.</EmptyState>
+        <EmptyState icon="doc" title={t('project.emptyTitle')}>{t('project.emptyBody')}</EmptyState>
       )}
     </>
   );
