@@ -243,6 +243,11 @@ export const tr = {
   'probe.unreachable': 'ulaşılamadı — sunucu çalışıyor mu?',
   'xtts.alreadyRunning': 'XTTS sunucusu zaten çalışıyor',
   'xtts.notRunning': 'XTTS sunucusu çalışmıyor',
+  'xttsVoices.onlyWav': 'yalnızca .wav dosyası yüklenebilir',
+  'xttsVoices.invalidName': 'geçersiz dosya adı',
+  'xttsVoices.tooBig': 'dosya çok büyük (üst sınır 20MB)',
+  'xttsVoices.notWav': 'geçerli bir WAV değil (RIFF başlığı yok)',
+  'xttsVoices.notFound': 'dosya yok',
   'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;

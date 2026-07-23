@@ -243,5 +243,10 @@ export const en: Record<MessageKey, string> = {
   'probe.unreachable': 'unreachable — is the server running?',
   'xtts.alreadyRunning': 'XTTS server is already running',
   'xtts.notRunning': 'XTTS server is not running',
+  'xttsVoices.onlyWav': 'only .wav files can be uploaded',
+  'xttsVoices.invalidName': 'invalid file name',
+  'xttsVoices.tooBig': 'file too large (20MB limit)',
+  'xttsVoices.notWav': 'not a valid WAV (missing RIFF header)',
+  'xttsVoices.notFound': 'file not found',
   'cast.narrator': 'Narrator',
 };
