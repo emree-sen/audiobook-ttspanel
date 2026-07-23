@@ -13,7 +13,15 @@ function fakeChild() {
 }
 
 describe('xtts-sidecar', () => {
-  beforeEach(() => { vi.resetModules(); spawnMock.mockReset(); });
+  // globalThis çapası (KN2) test'ler arası kalıcı: vi.resetModules() yalnızca modül
+  // önbelleğini temizler, önceki testin "canlı" sahte child'ı globalThis'te kalır — her
+  // testten önce açıkça sıfırlanmazsa xttsStart yanlışlıkla "already running" fırlatır.
+  beforeEach(async () => {
+    vi.resetModules();
+    spawnMock.mockReset();
+    const mod = await import('@/lib/services/xtts-sidecar');
+    mod.__xttsResetForTests();
+  });
 
   test('start: run.sh spawn edilir, loglar halka tamponda birikir', async () => {
     const mod = await import('@/lib/services/xtts-sidecar');
