@@ -34,14 +34,15 @@ function push(chunk: string) {
 // Panel süreci kapanırken (normal exit / SIGTERM / SIGINT) canlı sidecar'ı da öldür —
 // yoksa arka planda öksüz python süreci kalır. Tek seferlik kayıt (start'lar arası
 // yinelenmesin diye bayrak globalThis durumunda tutulur).
+// Sinyal dinleyicisi Node'un varsayılan çıkışını iptal eder — çocuğu öldürüp kendimiz çıkıyoruz.
 function ensureExitHandlers() {
   const s = state();
   if (s.exitHandlersRegistered) return;
   s.exitHandlersRegistered = true;
   const killChild = () => { state().child?.kill('SIGTERM'); };
   process.once('exit', killChild);
-  process.once('SIGTERM', killChild);
-  process.once('SIGINT', killChild);
+  process.once('SIGTERM', () => { killChild(); process.exit(143); });
+  process.once('SIGINT', () => { killChild(); process.exit(130); });
 }
 
 export function xttsStart(dir: string): void {
