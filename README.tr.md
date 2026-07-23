@@ -96,12 +96,12 @@ Hem annotation LLM'ini hem TTS'i kendi makinende çalıştır — hiçbir veri d
 1. **LLM — LM Studio** (veya Ollama, ya da OpenAI-uyumlu herhangi bir sunucu):
    bir model yükle (ör. `openai/gpt-oss-20b`) ve lokal sunucuyu başlat
    (LM Studio `http://localhost:1234/v1` adresinde sunar).
-   **Ayarlar → LLM**'den *OpenAI-uyumlu*'yu seç, adres ve model adını gir.
+   **Ayarlar → LLM (annotation)**'dan *OpenAI-uyumlu*'yu seç, adres ve model adını gir.
 2. **TTS — XTTS-v2** (doğal, ses klonlamalı, Türkçe destekli):
    bkz. [`tools/xtts-server/`](tools/xtts-server/README.md). Başlat, sonra
-   **Ayarlar**'dan `http://localhost:8020/v1` adresiyle bağlantı ekle ve referans
-   WAV dosya adlarıyla sesleri tanımla.
-   *Hafif alternatif:* [Piper](https://github.com/rhasspy/piper) yerleşik —
+   **Ayarlar**'dan `http://localhost:8020/v1` adresiyle bağlantı ekle, herhangi bir
+   model adı gir ve referans WAV dosya adlarıyla sesleri tanımla.
+   *Hafif alternatif:* [Piper](https://github.com/OHF-Voice/piper1-gpl) yerleşik —
    CPU'da bile hızlı, karşılığında daha düz bir ses.
 3. Sonradan bulut kalitesi mi istedin? Ayarlar'dan sağlayıcıyı değiştirmen yeter —
    lokal ve API sağlayıcıları bir arada yaşar.

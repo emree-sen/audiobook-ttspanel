@@ -96,12 +96,12 @@ Run both the annotation LLM and TTS on your own machine — nothing leaves it.
 1. **LLM — LM Studio** (or Ollama, or any OpenAI-compatible server):
    load a model (e.g. `openai/gpt-oss-20b`) and start the local server
    (LM Studio serves at `http://localhost:1234/v1`).
-   In **Settings → LLM**, pick *OpenAI-compatible*, set the address and model name.
+   In **Settings → LLM (annotation)**, pick *OpenAI-compatible*, set the address and model name.
 2. **TTS — XTTS-v2** (natural, voice cloning, Turkish support):
    see [`tools/xtts-server/`](tools/xtts-server/README.md). Start it, then add a
-   connection in **Settings** with address `http://localhost:8020/v1` and voices
-   named after your reference WAV files.
-   *Lighter alternative:* [Piper](https://github.com/rhasspy/piper) is built in —
+   connection in **Settings** with address `http://localhost:8020/v1`, any model
+   name, and voices named after your reference WAV files.
+   *Lighter alternative:* [Piper](https://github.com/OHF-Voice/piper1-gpl) is built in —
    fast even on CPU, at the cost of a flatter voice.
 3. Prefer cloud quality later? Just switch the provider back in Settings —
    local and API providers coexist.
