@@ -84,6 +84,28 @@ export default function SettingsPage() {
   const [llmBaseInput, setLlmBaseInput] = useState('');
   const [llmKeyInput, setLlmKeyInput] = useState('');
   const [conn, setConn] = useState({ id: '', label: '', baseUrl: '', apiKey: '', model: '' });
+  const [probeMsg, setProbeMsg] = useState<Record<string, string>>({}); // anahtar: 'llm' | bağlantı id'si
+  const [detected, setDetected] = useState<Record<string, boolean>>({});
+
+  async function probe(kind: 'llm' | 'tts', baseUrl: string, msgKey: string) {
+    const res = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, baseUrl }) });
+    const d = await res.json().catch(() => ({ ok: false, detail: '?' }));
+    setProbeMsg((m) => ({ ...m, [msgKey]: `${d.ok ? '✓' : '✗'} ${d.detail}` }));
+    return !!d.ok;
+  }
+
+  // Sayfa açılışında bilinen portları sessizce yokla (yalnızca rozet için).
+  useEffect(() => {
+    const targets: [string, 'llm' | 'tts', string][] = [
+      ['lmstudio', 'llm', 'http://localhost:1234/v1'],
+      ['ollama', 'llm', 'http://localhost:11434/v1'],
+      ['xtts', 'tts', 'http://localhost:8020/v1'],
+    ];
+    for (const [key, kind, baseUrl] of targets) {
+      fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, baseUrl }) })
+        .then((r) => r.json()).then((d) => setDetected((m) => ({ ...m, [key]: !!d.ok }))).catch(() => {});
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/settings');
@@ -193,9 +215,23 @@ export default function SettingsPage() {
               </span>
             </summary>
             <button className="ghost" onClick={() => addDefaults(c.id)}>{t('settings.addOfficialVoices')}</button>
+            <button className="ghost" onClick={() => probe('tts', c.baseUrl, c.id)}>{t('settings.probeButton')}</button>
+            {probeMsg[c.id] && <span className="muted">{probeMsg[c.id]}</span>}
             <VoicePool provider={c.id} rows={data.voices[c.id] ?? []} reload={load} onError={setErr} />
           </details>
         ))}
+        <div className="row">
+          <button type="button" className="ghost" disabled={data.connections.some((c) => c.id === 'xtts')}
+            onClick={async () => {
+              setErr('');
+              const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl: 'http://localhost:8020/v1', model: 'xtts-v2' }) });
+              if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.connectionAddError'));
+              await load();
+            }}>
+            <Icon name="plus" /> {t('settings.xttsPresetButton')} {detected.xtts && <span className="badge">{t('settings.detectedBadge')}</span>}
+          </button>
+          <span className="muted">{t('settings.presetHint')}</span>
+        </div>
         <form className="row wrap" onSubmit={(e) => { e.preventDefault(); addConnection(); }}>
           <input value={conn.id} onChange={(e) => setConn({ ...conn, id: e.target.value })} placeholder={t('settings.connIdPlaceholder')} style={{ maxWidth: '10rem' }} />
           <input value={conn.baseUrl} onChange={(e) => setConn({ ...conn, baseUrl: e.target.value })} placeholder="http://localhost:8000/v1" />
@@ -254,6 +290,16 @@ export default function SettingsPage() {
         </div>
         {data.llmProvider === 'openai-compat' && (
           <>
+            <div className="row">
+              <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:1234/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:1234/v1' }); }}>
+                LM Studio {detected.lmstudio && <span className="badge">{t('settings.detectedBadge')}</span>}
+              </button>
+              <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:11434/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:11434/v1' }); }}>
+                Ollama {detected.ollama && <span className="badge">{t('settings.detectedBadge')}</span>}
+              </button>
+              <button type="button" className="ghost" onClick={() => probe('llm', llmBaseInput.trim() || 'http://localhost:1234/v1', 'llm')}>{t('settings.probeButton')}</button>
+              {probeMsg.llm && <span className="muted">{probeMsg.llm}</span>}
+            </div>
             <form className="row" onSubmit={async (e) => {
               e.preventDefault();
               if (await put({ llmBaseUrl: llmBaseInput.trim(), ...(llmKeyInput.trim() ? { llmApiKey: llmKeyInput.trim() } : {}) })) setLlmKeyInput('');
