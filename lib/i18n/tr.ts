@@ -225,6 +225,10 @@ export const tr = {
   'error.llmOutputInvalid': 'LLM çıktısı doğrulanamadı: {error}',
   'error.llmBaseUrlMissing': 'LLM sunucu adresi yok — Ayarlar’dan girin veya .env LLM_BASE_URL tanımlayın',
   'error.llmModelMissing': 'LLM model adı yok — Ayarlar’dan girin veya .env LLM_MODEL tanımlayın',
+  'probe.okModels': 'bağlandı — {count} model',
+  'probe.okVoices': 'bağlandı — {count} ses',
+  'probe.httpError': 'sunucu hata döndürdü (HTTP {status})',
+  'probe.unreachable': 'ulaşılamadı — sunucu çalışıyor mu?',
   'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;

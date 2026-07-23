@@ -225,5 +225,9 @@ export const en: Record<MessageKey, string> = {
   'error.llmOutputInvalid': 'LLM output could not be validated: {error}',
   'error.llmBaseUrlMissing': 'LLM server address missing — set it in Settings or define LLM_BASE_URL in .env',
   'error.llmModelMissing': 'LLM model name missing — set it in Settings or define LLM_MODEL in .env',
+  'probe.okModels': 'connected — {count} models',
+  'probe.okVoices': 'connected — {count} voices',
+  'probe.httpError': 'server returned an error (HTTP {status})',
+  'probe.unreachable': 'unreachable — is the server running?',
   'cast.narrator': 'Narrator',
 };
