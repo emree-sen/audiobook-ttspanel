@@ -26,6 +26,13 @@ describe('POST /api/probe', () => {
     expect(d.models[0]).toBe('m0');
   });
 
+  test('llm: bozuk /models öğeleri (null vb.) yoksayılır', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, status: 200, json: async () => ({ data: [null, { id: 'a' }, { id: 5 }] }) }));
+    const d = await (await probeRoute.POST(jsonReq({ kind: 'llm', baseUrl: 'http://x/v1' }))).json();
+    expect(d.ok).toBe(true);
+    expect(d.models).toEqual(['a']);
+  });
+
   test('tts: /v1 kökünden /health okur, ses sayısını döndürür', async () => {
     const urls: string[] = [];
     vi.stubGlobal('fetch', async (u: string) => { urls.push(u); return { ok: true, status: 200, json: async () => ({ status: 'ok', voices: ['deneme'], device: 'cpu' }) }; });

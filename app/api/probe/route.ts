@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
     const data = (await res.json().catch(() => null)) as { data?: unknown[]; voices?: unknown[] } | null;
     if (kind === 'llm') {
       const models = (Array.isArray(data?.data) ? data.data : [])
-        .map((m) => (m as { id?: unknown }).id).filter((x): x is string => typeof x === 'string').slice(0, 20);
+        .map((m) => (typeof m === 'object' && m !== null ? (m as { id?: unknown }).id : undefined))
+        .filter((x): x is string => typeof x === 'string').slice(0, 20);
       return NextResponse.json({ ok: true, detail: tServer(req, 'probe.okModels', { count: models.length }), models });
     }
     const voices = (Array.isArray(data?.voices) ? data.voices : []).filter((x): x is string => typeof x === 'string');
