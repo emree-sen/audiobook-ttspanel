@@ -256,11 +256,10 @@ export default function SettingsPage() {
           <>
             <form className="row" onSubmit={async (e) => {
               e.preventDefault();
-              await put({ llmBaseUrl: llmBaseInput.trim(), ...(llmKeyInput.trim() ? { llmApiKey: llmKeyInput.trim() } : {}) });
-              setLlmKeyInput('');
+              if (await put({ llmBaseUrl: llmBaseInput.trim(), ...(llmKeyInput.trim() ? { llmApiKey: llmKeyInput.trim() } : {}) })) setLlmKeyInput('');
             }}>
               <input value={llmBaseInput} onChange={(e) => setLlmBaseInput(e.target.value)} placeholder={t('settings.llmBaseUrlPlaceholder')} aria-label={t('settings.llmBaseUrlAria')} />
-              <input value={llmKeyInput} onChange={(e) => setLlmKeyInput(e.target.value)} placeholder={data.llmApiKey ?? t('settings.llmApiKeyPlaceholder')} type="password" />
+              <input value={llmKeyInput} onChange={(e) => setLlmKeyInput(e.target.value)} placeholder={data.llmApiKey ?? t('settings.llmApiKeyPlaceholder')} type="password" autoComplete="off" />
               <button type="submit">{t('common.save')}</button>
             </form>
             <p className="muted">{t('settings.llmLocalHint')}</p>
