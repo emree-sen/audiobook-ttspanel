@@ -17,6 +17,9 @@ Flags are passed through: `--port 8020`, `--device cpu|cuda|mps`
 (`XTTS_DEVICE` env also works; default avoids MPS — it produces broken audio
 with this coqui-tts range). `GET /health` reports status, voices and device.
 
+**License note:** XTTS-v2 weights are under the Coqui CPML (non-commercial)
+license; this repo is MIT and does not ship them.
+
 ## Voices
 
 Drop reference recordings into `voices/` — one clean 6-30 s WAV per voice.

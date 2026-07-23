@@ -38,8 +38,9 @@ dinleme. Elle JSON yapıştırma fallback (aynı şema sözleşme).
 ## Durum
 
 Plan ① (audio core + CLI) ve Dilim A→D + UI redesign tamam; panel uçtan uca çalışıyor.
-Dilim E (lokal modeller) kod-tamam; kullanıcı makinesinde uçtan uca doğrulama (LM Studio +
-XTTS) bekliyor. Detaylar:
+Dilim E (lokal modeller) ve Dilim F (kolay kurulum) kod-tamam; uçtan uca doğrulama
+(LM Studio + XTTS) artık Dilim F'nin kolay kurulum yolundan (preset/sına/`run.sh`)
+geçiyor. Detaylar:
 
 - Plan ①: `docs/superpowers/plans/2026-07-13-milestone-0-audio-core.md`
 - Dilim A (panel iskeleti): `docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`
@@ -51,6 +52,7 @@ XTTS) bekliyor. Detaylar:
 - Dilim D (kütüphane + PWA): `docs/superpowers/specs/2026-07-19-panel-slice-d-library-pwa-player-design.md`
 - Public repo cilası (README/LICENSE): `docs/superpowers/specs/2026-07-20-public-repo-readme-design.md`
 - Dilim E (lokal modeller: OpenAI-uyumlu LLM + XTTS sunucusu): `docs/superpowers/specs/2026-07-23-panel-slice-e-local-models-design.md`
+- Dilim F (kolay kurulum: preset/sına/run.sh/sidecar): `docs/superpowers/specs/2026-07-23-panel-slice-f-easy-setup-design.md`
 
 ## Nasıl çalıştırılır
 
