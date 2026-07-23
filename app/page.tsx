@@ -5,10 +5,13 @@ import { Icon } from '@/lib/ui/Icon';
 import { ConfirmButton } from '@/lib/ui/ConfirmButton';
 import { EmptyState } from '@/lib/ui/EmptyState';
 import { refreshTree } from '@/lib/ui/refresh';
+import { useLang, useT } from '@/lib/ui/LanguageProvider';
 
 type Project = { id: string; title: string; description: string | null; updatedAt: number };
 
 export default function ProjectsPage() {
+  const t = useT();
+  const { lang } = useLang();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [title, setTitle] = useState('');
 
@@ -27,7 +30,7 @@ export default function ProjectsPage() {
   }
 
   async function rename(p: Project) {
-    const title = prompt('Yeni proje adı:', p.title);
+    const title = prompt(t('home.renamePrompt'), p.title);
     if (!title?.trim() || title === p.title) return;
     await fetch(`/api/projects/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.trim() }) });
     refreshTree(); load();
@@ -35,24 +38,24 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <div className="crumbs"><span className="here">Projeler</span></div>
-      <h1>Projeler</h1>
+      <div className="crumbs"><span className="here">{t('home.title')}</span></div>
+      <h1>{t('home.title')}</h1>
       <form onSubmit={create} className="row">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Yeni proje adı" style={{ maxWidth: '20rem' }} />
-        <button type="submit"><Icon name="plus" /> Ekle</button>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('home.newProjectPlaceholder')} style={{ maxWidth: '20rem' }} />
+        <button type="submit"><Icon name="plus" /> {t('common.add')}</button>
       </form>
 
-      {projects === null && <p className="muted">Yükleniyor…</p>}
+      {projects === null && <p className="muted">{t('common.loading')}</p>}
 
       {projects && projects.length > 0 && (
         <div className="grid">
           {projects.map((p) => (
             <div key={p.id} className="tile">
               <Link href={`/projects/${p.id}`} className="title">{p.title}</Link>
-              <div className="sub">{new Date(p.updatedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              <div className="sub">{new Date(p.updatedAt).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
               <div className="actions">
-                <button className="icon" onClick={() => rename(p)} aria-label="Yeniden adlandır" title="Yeniden adlandır"><Icon name="pencil" /></button>
-                <ConfirmButton onConfirm={() => remove(p.id)} ariaLabel="Projeyi sil" />
+                <button className="icon" onClick={() => rename(p)} aria-label={t('common.rename')} title={t('common.rename')}><Icon name="pencil" /></button>
+                <ConfirmButton onConfirm={() => remove(p.id)} ariaLabel={t('home.deleteProject')} />
               </div>
             </div>
           ))}
@@ -60,7 +63,7 @@ export default function ProjectsPage() {
       )}
 
       {projects && projects.length === 0 && (
-        <EmptyState icon="doc" title="Henüz proje yok">İlk projeni yukarıdaki alandan ekle.</EmptyState>
+        <EmptyState icon="doc" title={t('home.emptyTitle')}>{t('home.emptyBody')}</EmptyState>
       )}
     </>
   );

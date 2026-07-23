@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createDb, setDbForTests, type Db } from '@/lib/db/client';
 import { getSetting, setSetting } from '@/lib/services/settings';
 import * as settingsRoute from '@/app/api/settings/route';
@@ -9,7 +10,7 @@ import * as voiceRoute from '@/app/api/voices/[id]/route';
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const jsonReq = (method: string, body?: unknown) =>
-  new Request('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  new NextRequest('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 let db: Db;
 beforeEach(() => { db = createDb(':memory:'); setDbForTests(db); });

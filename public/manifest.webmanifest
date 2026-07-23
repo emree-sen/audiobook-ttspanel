@@ -1,6 +1,6 @@
 {
-  "name": "webnovel-tts",
-  "short_name": "webnovel-tts",
+  "name": "audiobook-ttspanel",
+  "short_name": "audiobook-ttspanel",
   "start_url": "/library",
   "display": "standalone",
   "background_color": "#0f1115",

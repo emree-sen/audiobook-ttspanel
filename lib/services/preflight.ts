@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { audioCache, scripts } from '../db/schema';
+import { t, type Lang } from '../i18n';
 import { getSetting } from './settings';
 import { latestScript, type ScriptRow } from './scripts';
 import { activeProvider, quotaLimit, remainingToday, usedToday } from './quota';
@@ -20,11 +21,11 @@ export function segmentHash(i: { provider: string; model: string; voice: string;
 
 // Üretim planı: her segment için çözülmüş ses/stil + içerik hash'i.
 // scriptId verilirse o versiyona sabitlenir (iş yürütme); yoksa en güncel (preflight).
-export function planChapter(db: Db, chapterId: string, scriptId?: string): { scriptRow: ScriptRow; script: VoiceoverScript; plan: PlanItem[] } {
+export function planChapter(db: Db, chapterId: string, scriptId?: string, lang: Lang = 'tr'): { scriptRow: ScriptRow; script: VoiceoverScript; plan: PlanItem[] } {
   const scr = scriptId
     ? db.select().from(scripts).where(eq(scripts.id, scriptId)).get()
     : latestScript(db, chapterId);
-  if (!scr) throw new Error('Bölümün script’i yok — önce script üretin');
+  if (!scr) throw new Error(t(lang, 'error.noScriptGenerateFirst'));
   let script = parseScript(JSON.parse(scr.json));
   const single = getSetting(db, 'single_voice') ?? process.env.TTS_SINGLE_VOICE;
   if (single) script = overrideAllVoices(script, single);
@@ -51,8 +52,8 @@ export interface Preflight {
   fits: boolean;
 }
 
-export function preflightChapter(db: Db, chapterId: string): Preflight {
-  const { script, plan } = planChapter(db, chapterId);
+export function preflightChapter(db: Db, chapterId: string, lang: Lang = 'tr'): Preflight {
+  const { script, plan } = planChapter(db, chapterId, undefined, lang);
   let cached = 0;
   for (const p of plan) if (db.select().from(audioCache).where(eq(audioCache.hash, p.hash)).get()) cached++;
   const newCalls = plan.length - cached;

@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { deleteChapter, getChapter, updateChapter } from '@/lib/services/chapters';
 import { latestScript, listSegments } from '@/lib/services/scripts';
 import { listRenders } from '@/lib/services/generation';
+import { tServer } from '@/lib/i18n/server';
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const db = getDb();
   const chapter = getChapter(db, id);
-  if (!chapter) return NextResponse.json({ error: 'Bölüm bulunamadı' }, { status: 404 });
+  if (!chapter) return NextResponse.json({ error: tServer(req, 'error.chapterNotFound') }, { status: 404 });
   const scr = latestScript(db, id);
   const segments = scr ? listSegments(db, scr.id) : [];
   let cast: unknown[] = [];
@@ -29,7 +30,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   });
 }
 
-export async function PATCH(req: Request, { params }: Ctx) {
+export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const patch: Parameters<typeof updateChapter>[2] = { title: body.title, rawText: body.rawText, narrationStyle: body.narrationStyle };
@@ -37,7 +38,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (body.voiceMode === 'narrator' || body.voiceMode === 'multi') patch.voiceMode = body.voiceMode;
   if (typeof body.maxCharacters === 'number' && body.maxCharacters >= 1) patch.maxCharacters = Math.floor(body.maxCharacters);
   const updated = updateChapter(getDb(), id, patch);
-  if (!updated) return NextResponse.json({ error: 'Bölüm bulunamadı' }, { status: 404 });
+  if (!updated) return NextResponse.json({ error: tServer(req, 'error.chapterNotFound') }, { status: 404 });
   return NextResponse.json(updated);
 }
 

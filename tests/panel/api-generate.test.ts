@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createDb, setDbForTests, type Db } from '@/lib/db/client';
 import { audioDir } from '@/lib/config';
 import { safeAudioPath } from '@/lib/paths';
@@ -21,7 +22,7 @@ import * as audioRoute from '@/app/api/audio/[...path]/route';
 const FIXTURE = readFileSync('fixtures/sample-tr.json', 'utf8');
 const ctx = <T,>(p: T) => ({ params: Promise.resolve(p) });
 const jsonReq = (method: string, body?: unknown) =>
-  new Request('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  new NextRequest('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 let tmp: string;
 beforeAll(() => { tmp = mkdtempSync(join(tmpdir(), 'wnt-api-')); process.env.DATA_DIR = tmp; });

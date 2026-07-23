@@ -26,7 +26,7 @@ export class GeminiLlmAdapter implements LlmAdapter {
           },
         });
         const text = response.text ?? response.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-        if (!text) throw new Error(`boş yanıt (finishReason=${response.candidates?.[0]?.finishReason ?? 'yok'})`);
+        if (!text) throw new Error(`empty response from Gemini (finishReason=${response.candidates?.[0]?.finishReason ?? 'none'})`);
         const u = response.usageMetadata;
         return { json: extractJson(text), usage: { inputTokens: u?.promptTokenCount ?? 0, outputTokens: u?.candidatesTokenCount ?? 0 } };
       } catch (e) {
@@ -34,6 +34,6 @@ export class GeminiLlmAdapter implements LlmAdapter {
         await new Promise((r) => setTimeout(r, 1500 * attempt));
       }
     }
-    throw new Error(`Gemini LLM çağrısı başarısız: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+    throw new Error(`Gemini LLM call failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
   }
 }

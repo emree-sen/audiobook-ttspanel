@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { listeningProgress } from '../db/schema';
+import { t, type Lang } from '../i18n';
 import { listProjects } from './projects';
 import { getChapter, listChapters } from './chapters';
 import { listRenders } from './generation';
@@ -32,8 +33,8 @@ export function getLibrary(db: Db): LibrarySeries[] {
   return out;
 }
 
-export function saveProgress(db: Db, chapterId: string, p: { positionSec: number; durationSec?: number }): void {
-  if (!getChapter(db, chapterId)) throw new Error('Bölüm bulunamadı');
+export function saveProgress(db: Db, chapterId: string, p: { positionSec: number; durationSec?: number }, lang: Lang = 'tr'): void {
+  if (!getChapter(db, chapterId)) throw new Error(t(lang, 'error.chapterNotFound'));
   const now = Date.now();
   db.insert(listeningProgress)
     .values({ chapterId, positionSec: p.positionSec, durationSec: p.durationSec ?? null, updatedAt: now })

@@ -13,7 +13,7 @@
 
 **English** | [Türkçe](README.tr.md)
 
-<img src="docs/screenshots/studio.png" alt="Production studio" width="800">
+<img src="docs/screenshots/en/studio.png" alt="Production studio" width="800">
 
 </div>
 
@@ -45,6 +45,7 @@ The voicing script is a plain JSON contract — you can also write or edit it by
 - Project → chapter organization with a dark studio UI
 - LLM annotation: raw text + narration style + voice mode (single narrator / multi-character) → structured voicing script; re-generate with extra instructions; per-character voice override
 - Script and per-segment editing before or after rendering
+- The panel UI speaks English and Turkish (auto-detected, switchable in Settings).
 
 **Production pipeline**
 - DB-backed job queue — survives browser close and server restarts; pause/resume
@@ -65,7 +66,7 @@ The voicing script is a plain JSON contract — you can also write or edit it by
 - Global player bar: 0.75–2× speed, ±15/30 s skips, auto-next chapter, lock-screen controls (MediaSession)
 
 <div align="center">
-<img src="docs/screenshots/library.png" alt="Library and player" width="800">
+<img src="docs/screenshots/en/library.png" alt="Library and player" width="800">
 </div>
 
 ## Quick start
@@ -154,8 +155,6 @@ Advanced: you can also paste a hand-written JSON voicing script (schema:
   and the cache picks up right where it left off.
 - LLM annotation defaults to `gemini-2.5-flash` (free-tier quota, separate from the TTS
   quota); override with `LLM_MODEL`.
-- The panel UI is currently Turkish-only (the product is Turkish-first; the pipeline
-  itself works with any language your TTS provider supports).
 - Audio is served as whole files to the in-panel `<audio>` element; seeking there can
   be limited (the PWA player's downloaded chapters seek fine).
 

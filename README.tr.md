@@ -13,7 +13,7 @@
 
 [English](README.md) | **Türkçe**
 
-<img src="docs/screenshots/studio.png" alt="Üretim stüdyosu" width="800">
+<img src="docs/screenshots/tr/studio.png" alt="Üretim stüdyosu" width="800">
 
 </div>
 
@@ -45,6 +45,7 @@ Seslendirme scripti düz bir JSON sözleşmesidir — elle de yazabilir veya dü
 - Koyu stüdyo arayüzüyle proje → bölüm organizasyonu
 - LLM annotation: ham metin + anlatım tarzı + ses modu (tek anlatıcı / çok karakterli) → yapılandırılmış seslendirme scripti; ek talimatla yeniden üretme; karakter bazında ses değiştirme
 - Üretimden önce veya sonra script ve segment düzeyinde düzenleme
+- Panel arayüzü İngilizce ve Türkçe konuşur (otomatik algılanır, Ayarlar'dan değiştirilebilir).
 
 **Üretim hattı**
 - DB destekli iş kuyruğu — tarayıcı kapansa da, sunucu yeniden başlasa da sürer; duraklat/devam
@@ -65,7 +66,7 @@ Seslendirme scripti düz bir JSON sözleşmesidir — elle de yazabilir veya dü
 - Global oynatıcı çubuğu: 0.75–2× hız, ±15/30 sn atlama, otomatik sonraki bölüm, kilit ekranı kontrolleri (MediaSession)
 
 <div align="center">
-<img src="docs/screenshots/library.png" alt="Kütüphane ve oynatıcı" width="800">
+<img src="docs/screenshots/tr/library.png" alt="Kütüphane ve oynatıcı" width="800">
 </div>
 
 ## Hızlı başlangıç
@@ -154,8 +155,6 @@ Gelişmiş: elle yazılmış bir JSON seslendirme scripti de yapıştırabilirsi
   önbellek sayesinde kaldığı yerden sürer.
 - LLM annotation varsayılanı `gemini-2.5-flash` (ücretsiz kota, TTS kotasından ayrı);
   `LLM_MODEL` ile değiştirilebilir.
-- Panel arayüzü şimdilik yalnızca Türkçe (ürün Türkçe öncelikli; hattın kendisi TTS
-  sağlayıcının desteklediği her dille çalışır).
 - Ses, panel içi `<audio>` elemanına tam dosya olarak servis edilir; orada sarma
   kısıtlı olabilir (PWA oynatıcının indirilen bölümlerinde sarma sorunsuz çalışır).
 

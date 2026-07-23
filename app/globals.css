@@ -257,6 +257,16 @@ summary:hover { color: var(--text); }
 .side-scrim { display: none; }
 .side-toggle { display: none; }
 
+/* Sidebar dil kısayolu */
+.side-lang { display: flex; gap: 4px; padding: 0.5rem 0.5rem 0.2rem; }
+.lang-btn {
+  background: transparent; color: var(--muted); font-weight: 600;
+  font-size: 0.68rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); opacity: 0.7;
+}
+.lang-btn:hover:not(:disabled) { color: var(--text); background: var(--surface-2); opacity: 1; }
+.lang-btn.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); opacity: 1; border-color: var(--accent); }
+
 @media (max-width: 900px) {
   .side-wrap {
     position: fixed; left: 0; top: 3.4rem; bottom: 0; height: auto;

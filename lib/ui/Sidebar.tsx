@@ -3,12 +3,15 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
+import { useLang, useT } from './LanguageProvider';
 
 type Chapter = { id: string; title: string; position: number; status: string };
 type Node = { project: { id: string; title: string }; chapters: Chapter[] };
 
 // Sol panel: proje klasörleri → bölüm satırları. Navigasyon odaklı; yönetim sayfalarda.
 export function Sidebar() {
+  const t = useT();
+  const { lang, setLang } = useLang();
   const pathname = usePathname();
   const [tree, setTree] = useState<Node[] | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -45,13 +48,13 @@ export function Sidebar() {
 
   return (
     <>
-      <button className="side-toggle" onClick={() => setDrawer((d) => !d)} aria-label="Kütüphane menüsü" title="Kütüphane">
+      <button className="side-toggle" onClick={() => setDrawer((d) => !d)} aria-label={t('sidebar.menu')} title={t('sidebar.library')}>
         <Icon name="menu" />
       </button>
       {drawer && <div className="side-scrim" onClick={() => setDrawer(false)} />}
       <div className={drawer ? 'side-wrap open' : 'side-wrap'}>
-        <nav className="side" aria-label="Kütüphane">
-          {tree === null && <p className="muted">Yükleniyor…</p>}
+        <nav className="side" aria-label={t('sidebar.library')}>
+          {tree === null && <p className="muted">{t('common.loading')}</p>}
           {tree?.map(({ project, chapters }) => (
             <div key={project.id} className="side-proj">
               <button className="side-head" onClick={() => toggle(project.id)} aria-expanded={open.has(project.id)}>
@@ -69,7 +72,7 @@ export function Sidebar() {
                       <span className={`dot ${c.status}`} title={c.status} />
                     </Link>
                   ))}
-                  <Link href={`/projects/${project.id}`} className="side-item manage"><Icon name="pencil" size={12} /> Yönet</Link>
+                  <Link href={`/projects/${project.id}`} className="side-item manage"><Icon name="pencil" size={12} /> {t('sidebar.manage')}</Link>
                 </div>
               )}
             </div>
@@ -77,13 +80,22 @@ export function Sidebar() {
           {tree !== null && (
             <>
               <Link href="/library" className={pathname === '/library' ? 'side-item manage on' : 'side-item manage'}>
-                <Icon name="headphones" size={12} /> Kütüphane
+                <Icon name="headphones" size={12} /> {t('sidebar.library')}
               </Link>
-              <Link href="/" className="side-item manage"><Icon name="plus" size={12} /> Yeni proje</Link>
+              <Link href="/" className="side-item manage"><Icon name="plus" size={12} /> {t('sidebar.newProject')}</Link>
               <Link href="/settings" className={pathname === '/settings' ? 'side-item manage on' : 'side-item manage'}>
-                <Icon name="gear" size={12} /> Ayarlar
+                <Icon name="gear" size={12} /> {t('sidebar.settings')}
               </Link>
             </>
+          )}
+          {tree !== null && (
+            <div className="side-lang">
+              {(['tr', 'en'] as const).map((l) => (
+                <button key={l} className={l === lang ? 'lang-btn on' : 'lang-btn'} onClick={() => setLang(l)}>
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
           )}
         </nav>
       </div>

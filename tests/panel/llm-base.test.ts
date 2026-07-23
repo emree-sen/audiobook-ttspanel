@@ -5,7 +5,7 @@ import { buildSystemPrompt, buildUserPrompt } from '@/lib/llm/prompt';
 describe('extractJson', () => {
   test('düz JSON parse', () => expect(extractJson('{"a":1}')).toEqual({ a: 1 }));
   test('metin içinden ilk {...} bloğu', () => expect(extractJson('İşte JSON:\n```json\n{"a":1}\n```')).toEqual({ a: 1 }));
-  test('JSON yoksa Türkçe hata', () => expect(() => extractJson('json yok')).toThrow(/JSON bulunamadı/));
+  test('JSON yoksa İngilizce teknik hata', () => expect(() => extractJson('json yok')).toThrow(/could not extract JSON/));
 });
 
 describe('llmChunkSchema', () => {
