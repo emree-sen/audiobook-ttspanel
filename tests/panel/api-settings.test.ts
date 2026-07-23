@@ -50,6 +50,27 @@ describe('PUT /api/settings', () => {
     const res = await settingsRoute.PUT(jsonReq('PUT', { provider: 'yok-boyle' }));
     expect(res.status).toBe(400);
   });
+  test('openai-compat LLM ayarları yazılır; anahtar maskelenir; null silme çalışır', async () => {
+    let res = await settingsRoute.PUT(jsonReq('PUT', {
+      llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:1234/v1', llmApiKey: 'lm-studio-key', llmModel: 'openai/gpt-oss-20b',
+    }));
+    expect(res.status).toBe(200);
+    expect(getSetting(db, 'llm_provider')).toBe('openai-compat');
+    expect(getSetting(db, 'llm_base_url')).toBe('http://localhost:1234/v1');
+    expect(getSetting(db, 'llm_api_key')).toBe('lm-studio-key');
+    const d = await (await settingsRoute.GET()).json();
+    expect(d.llmProvider).toBe('openai-compat');
+    expect(d.llmBaseUrl).toBe('http://localhost:1234/v1');
+    expect(d.llmApiKey).toBe('••••-key');
+    res = await settingsRoute.PUT(jsonReq('PUT', { llmApiKey: null, llmBaseUrl: '' }));
+    expect(res.status).toBe(200);
+    expect(getSetting(db, 'llm_api_key')).toBeUndefined();
+    expect(getSetting(db, 'llm_base_url')).toBeUndefined();
+  });
+  test('maskeli LLM anahtarı reddedilir → 400', async () => {
+    const res = await settingsRoute.PUT(jsonReq('PUT', { llmApiKey: '••••-key' }));
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('connections + voices rotaları', () => {
