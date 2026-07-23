@@ -288,18 +288,18 @@ export default function SettingsPage() {
             <button type="submit">{t('common.save')}</button>
           </form>
         </div>
+        <div className="row">
+          <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:1234/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:1234/v1' }); }}>
+            LM Studio {detected.lmstudio && <span className="badge">{t('settings.detectedBadge')}</span>}
+          </button>
+          <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:11434/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:11434/v1' }); }}>
+            Ollama {detected.ollama && <span className="badge">{t('settings.detectedBadge')}</span>}
+          </button>
+          <button type="button" className="ghost" onClick={() => probe('llm', llmBaseInput.trim() || 'http://localhost:1234/v1', 'llm')}>{t('settings.probeButton')}</button>
+          {probeMsg.llm && <span className="muted">{probeMsg.llm}</span>}
+        </div>
         {data.llmProvider === 'openai-compat' && (
           <>
-            <div className="row">
-              <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:1234/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:1234/v1' }); }}>
-                LM Studio {detected.lmstudio && <span className="badge">{t('settings.detectedBadge')}</span>}
-              </button>
-              <button type="button" className="ghost" onClick={() => { setLlmBaseInput('http://localhost:11434/v1'); put({ llmProvider: 'openai-compat', llmBaseUrl: 'http://localhost:11434/v1' }); }}>
-                Ollama {detected.ollama && <span className="badge">{t('settings.detectedBadge')}</span>}
-              </button>
-              <button type="button" className="ghost" onClick={() => probe('llm', llmBaseInput.trim() || 'http://localhost:1234/v1', 'llm')}>{t('settings.probeButton')}</button>
-              {probeMsg.llm && <span className="muted">{probeMsg.llm}</span>}
-            </div>
             <form className="row" onSubmit={async (e) => {
               e.preventDefault();
               if (await put({ llmBaseUrl: llmBaseInput.trim(), ...(llmKeyInput.trim() ? { llmApiKey: llmKeyInput.trim() } : {}) })) setLlmKeyInput('');
