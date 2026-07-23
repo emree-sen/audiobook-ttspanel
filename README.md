@@ -150,7 +150,8 @@ Advanced: you can also paste a hand-written JSON voicing script (schema:
 ## Known limitations
 
 - Gemini TTS free tier: **~100 requests/day per model.** The panel shows the call count
-  before starting, pauses the job when the quota runs out and resumes next day.
+  before starting and pauses the job when the quota runs out; resume it the next day
+  and the cache picks up right where it left off.
 - LLM annotation defaults to `gemini-2.5-flash` (free-tier quota, separate from the TTS
   quota); override with `LLM_MODEL`.
 - The panel UI is currently Turkish-only (the product is Turkish-first; the pipeline

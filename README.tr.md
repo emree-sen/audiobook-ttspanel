@@ -150,7 +150,8 @@ Gelişmiş: elle yazılmış bir JSON seslendirme scripti de yapıştırabilirsi
 ## Bilinen kısıtlar
 
 - Gemini TTS ücretsiz katmanı: **model başına günde ~100 istek.** Panel, üretime başlamadan önce
-  çağrı sayısını gösterir; kota bitince işi duraklatır ve ertesi gün devam eder.
+  çağrı sayısını gösterir; kota bitince işi duraklatır. Ertesi gün devam ettirdiğinde
+  önbellek sayesinde kaldığı yerden sürer.
 - LLM annotation varsayılanı `gemini-2.5-flash` (ücretsiz kota, TTS kotasından ayrı);
   `LLM_MODEL` ile değiştirilebilir.
 - Panel arayüzü şimdilik yalnızca Türkçe (ürün Türkçe öncelikli; hattın kendisi TTS
