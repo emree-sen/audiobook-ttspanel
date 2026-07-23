@@ -1,11 +1,13 @@
+import type { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { ensureWorker, latestJob } from '@/lib/services/producer';
 import { listSegments } from '@/lib/services/scripts';
+import { tServer } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getDb();
   void ensureWorker(db); // yeniden başlatma sonrası bekleyen işleri toparlar
@@ -18,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       };
       for (;;) {
         const job = latestJob(db, id);
-        if (!job) { send('failed', { message: 'Bu bölüm için iş yok' }); break; }
+        if (!job) { send('failed', { message: tServer(req, 'job.notFound') }); break; }
         const base = { jobId: job.id, done: job.doneCount, total: job.totalCount, status: job.status };
         if (job.status === 'running' || (job.status === 'queued' && !job.pausedReason)) {
           if (!send('progress', base)) break;
@@ -31,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         } else if (job.status === 'queued') {
           send('paused', { ...base, reason: job.pausedReason });
         } else {
-          send('failed', { ...base, message: job.error ?? 'İş iptal edildi' });
+          send('failed', { ...base, message: job.error ?? tServer(req, 'job.canceled') });
         }
         break;
       }

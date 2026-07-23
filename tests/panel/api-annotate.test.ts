@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createDb, setDbForTests, type Db } from '@/lib/db/client';
 import { createProject } from '@/lib/services/projects';
 import { createChapter, updateChapter } from '@/lib/services/chapters';
@@ -8,8 +9,12 @@ import * as castVoiceRoute from '@/app/api/chapters/[id]/cast-voice/route';
 import * as chapterRoute from '@/app/api/chapters/[id]/route';
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-const jsonReq = (method: string, body?: unknown) =>
-  new Request('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+const jsonReq = (method: string, body?: unknown, cookie?: string) =>
+  new NextRequest('http://p', {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: `lang=${cookie}` } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 const TEXT = 'Zindan kapısı gıcırdadı. "Kim var orada?" Kaan geriledi.';
 
 let db: Db;
@@ -39,12 +44,20 @@ describe('annotate SSE', () => {
     expect(detail.cast.map((c: any) => c.character_id).sort()).toEqual(['kisi1', 'narrator']);
   });
 
-  test('boş metin: SSE error olayı', async () => {
+  test('boş metin: SSE error olayı (TR cookie)', async () => {
+    const id = mkChapter();
+    updateChapter(db, id, { rawText: '' });
+    const body = await new Response((await annotateRoute.POST(jsonReq('POST', {}, 'tr'), ctx(id))).body).text();
+    expect(body).toContain('event: error');
+    expect(body).toContain('metni boş');
+  });
+
+  test('boş metin: SSE error olayı (cookiesiz → EN)', async () => {
     const id = mkChapter();
     updateChapter(db, id, { rawText: '' });
     const body = await new Response((await annotateRoute.POST(jsonReq('POST', {}), ctx(id))).body).text();
     expect(body).toContain('event: error');
-    expect(body).toContain('metni boş');
+    expect(body).toContain('is empty');
   });
 });
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createDb, setDbForTests } from '@/lib/db/client';
 import * as projectsRoute from '@/app/api/projects/route';
 import * as projectRoute from '@/app/api/projects/[id]/route';
@@ -10,7 +11,7 @@ import * as scriptRoute from '@/app/api/chapters/[id]/script/route';
 const FIXTURE = readFileSync('fixtures/sample-tr.json', 'utf8');
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const jsonReq = (method: string, body?: unknown) =>
-  new Request('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  new NextRequest('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 beforeEach(() => setDbForTests(createDb(':memory:')));
 
@@ -44,7 +45,7 @@ describe('API CRUD', () => {
     expect(pd.chapters).toHaveLength(1);
 
     // script import
-    const put = await scriptRoute.PUT(new Request('http://p', { method: 'PUT', body: FIXTURE }), ctx(c.id));
+    const put = await scriptRoute.PUT(new NextRequest('http://p', { method: 'PUT', body: FIXTURE }), ctx(c.id));
     expect(put.status).toBe(200);
     expect((await put.json()).segmentCount).toBe(5);
 
@@ -76,7 +77,7 @@ describe('API CRUD', () => {
   test('geçersiz script 400 + Türkçe hata', async () => {
     const p = await (await projectsRoute.POST(jsonReq('POST', { title: 'R' }))).json();
     const c = await (await projChaptersRoute.POST(jsonReq('POST', { title: 'B' }), ctx(p.id))).json();
-    const res = await scriptRoute.PUT(new Request('http://p', { method: 'PUT', body: '{bozuk' }), ctx(c.id));
+    const res = await scriptRoute.PUT(new NextRequest('http://p', { method: 'PUT', body: '{bozuk' }), ctx(c.id));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/JSON/i);
   });

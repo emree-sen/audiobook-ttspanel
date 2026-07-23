@@ -1,6 +1,7 @@
 import { desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { renders } from '../db/schema';
+import { t, type Lang } from '../i18n';
 import { getSetting } from './settings';
 import { activeProvider } from './quota';
 import { getConnection } from './connections';
@@ -24,24 +25,24 @@ export function supportsStyle(provider: string): boolean {
 }
 
 // Ayarlar (settings) → env → varsayılan sırasıyla aktif sağlayıcının adapter'ını kurar.
-export function adapterFromSettings(db: Db): TtsAdapter {
+export function adapterFromSettings(db: Db, lang: Lang = 'tr'): TtsAdapter {
   const { name: provider, model } = activeProvider(db);
   if (provider === 'mock') return new MockAdapter();
   if (provider === 'gemini') {
     const key = geminiApiKey(db);
-    if (!key) throw new Error('Gemini API anahtarı yok — Ayarlar’dan girin veya .env GEMINI_API_KEY tanımlayın');
+    if (!key) throw new Error(t(lang, 'error.geminiKeyMissing'));
     return new GeminiAdapter(key, model || undefined);
   }
   if (provider === 'piper') {
     const exe = getSetting(db, 'piper_exe');
-    if (!exe) throw new Error('Piper exe yolu tanımsız — Ayarlar’dan girin');
+    if (!exe) throw new Error(t(lang, 'error.piperExeMissing'));
     const models: Record<string, string> = {};
     for (const v of listVoices(db, 'piper')) if (v.path) models[v.voice] = v.path;
-    if (Object.keys(models).length === 0) throw new Error('Piper ses modeli yok — Ayarlar’dan .onnx ekleyin');
+    if (Object.keys(models).length === 0) throw new Error(t(lang, 'error.piperNoVoiceModel'));
     return new PiperAdapter({ exePath: exe, models });
   }
   const conn = getConnection(db, provider);
-  if (!conn) throw new Error(`Bilinmeyen TTS sağlayıcısı: "${provider}" — Ayarlar’dan bağlantı tanımlayın`);
+  if (!conn) throw new Error(t(lang, 'error.unknownTtsProvider', { provider }));
   return new OpenAiCompatAdapter({ id: conn.id, baseUrl: conn.baseUrl, apiKey: conn.apiKey, model: conn.model });
 }
 

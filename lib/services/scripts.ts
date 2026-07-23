@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { jobs, scripts, segments } from '../db/schema';
 import { newId } from '../id';
+import { t, type Lang } from '../i18n';
 import { updateChapter } from './chapters';
 import { parseScript } from '@/src/core/schema';
 import { parseVoiceId, resolveVoiceForSpeaker, validateSpeakers } from '@/src/core/voices';
@@ -38,13 +39,13 @@ export function importScript(db: Db, chapterId: string, jsonText: string): { scr
 }
 
 // En güncel script'in cast'inde bir karakterin sesini değiştirip yeni versiyon yazar (LLM çağrısı yok).
-export function changeCastVoice(db: Db, chapterId: string, characterId: string, voiceId: string): { scriptId: string; version: number } {
+export function changeCastVoice(db: Db, chapterId: string, characterId: string, voiceId: string, lang: Lang = 'tr'): { scriptId: string; version: number } {
   const scr = latestScript(db, chapterId);
-  if (!scr) throw new Error('Bölümün script\'i yok');
+  if (!scr) throw new Error(t(lang, 'error.noScript'));
   parseVoiceId(voiceId); // format doğrulaması (geçersizse fırlatır)
   const json = JSON.parse(scr.json) as { cast?: { character_id: string; voice_id: string }[] };
   const member = json.cast?.find((c) => c.character_id === characterId);
-  if (!member) throw new Error(`Karakter bulunamadı: "${characterId}"`);
+  if (!member) throw new Error(t(lang, 'error.characterNotFound', { id: characterId }));
   member.voice_id = voiceId;
   const saved = saveScript(db, chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);
   return { scriptId: saved.scriptId, version: saved.version };
@@ -52,18 +53,18 @@ export function changeCastVoice(db: Db, chapterId: string, characterId: string, 
 
 // En güncel scriptte TEK segmentin metnini/stilini değiştirip yeni versiyon yazar (LLM/TTS çağrısı yok).
 // Hash değişir → üretimde yalnız bu segment yeni çağrı olur; kalanlar cache'ten (C1).
-export function editSegment(db: Db, segmentId: string, patch: { text?: string; style?: string | null }): { scriptId: string; version: number } {
+export function editSegment(db: Db, segmentId: string, patch: { text?: string; style?: string | null }, lang: Lang = 'tr'): { scriptId: string; version: number } {
   const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
-  if (!row) throw new Error('Segment bulunamadı');
+  if (!row) throw new Error(t(lang, 'error.segmentNotFound'));
   const active = db.select().from(jobs)
     .where(and(eq(jobs.chapterId, row.chapterId), inArray(jobs.status, ['queued', 'running']))).get();
-  if (active) throw new Error('Bölümde aktif bir üretim işi var — düzenlemeden önce bitmesini bekleyin veya duraklatılmışsa iptal edin');
+  if (active) throw new Error(t(lang, 'error.activeJobEditWait'));
   const scr = latestScript(db, row.chapterId);
-  if (!scr || scr.id !== row.scriptId) throw new Error('Segment güncel script’e ait değil — sayfayı yenileyin');
-  if (patch.text !== undefined && !patch.text.trim()) throw new Error('Segment metni boş olamaz');
+  if (!scr || scr.id !== row.scriptId) throw new Error(t(lang, 'error.segmentStale'));
+  if (patch.text !== undefined && !patch.text.trim()) throw new Error(t(lang, 'error.segmentTextEmpty'));
   const json = JSON.parse(scr.json) as { segments: { text: string; style?: string }[] };
   const seg = json.segments[row.idx];
-  if (!seg) throw new Error('Segment script içinde bulunamadı');
+  if (!seg) throw new Error(t(lang, 'error.segmentNotInScript'));
   if (patch.text !== undefined) seg.text = patch.text.trim();
   if (patch.style !== undefined) { if (patch.style?.trim()) seg.style = patch.style.trim(); else delete seg.style; }
   const saved = saveScript(db, row.chapterId, JSON.stringify(json), scr.source as 'manual' | 'llm', scr.usageJson ?? undefined);

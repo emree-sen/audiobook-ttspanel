@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { tr } from '@/lib/i18n/tr';
 import { en } from '@/lib/i18n/en';
 import { format, getDict, resolveLang } from '@/lib/i18n';
+import { tServer } from '@/lib/i18n/server';
 
 describe('i18n sözlükleri', () => {
   it('TR ve EN anahtar kümeleri birebir aynı', () => {
@@ -41,5 +42,21 @@ describe('getDict', () => {
   it('dile göre sözlük döner', () => {
     expect(getDict('tr')).toBe(tr);
     expect(getDict('en')).toBe(en);
+  });
+});
+
+describe('tServer', () => {
+  const fakeReq = (cookie?: string, accept?: string) =>
+    ({
+      cookies: { get: (n: string) => (cookie && n === 'lang' ? { value: cookie } : undefined) },
+      headers: new Headers(accept ? { 'accept-language': accept } : {}),
+    }) as unknown as import('next/server').NextRequest;
+
+  it('cookie diline göre mesaj döner', () => {
+    expect(tServer(fakeReq('en'), 'common.loading')).toBe('Loading…');
+    expect(tServer(fakeReq('tr'), 'common.loading')).toBe('Yükleniyor…');
+  });
+  it('cookie yoksa accept-language', () => {
+    expect(tServer(fakeReq(undefined, 'tr-TR'), 'common.loading')).toBe('Yükleniyor…');
   });
 });

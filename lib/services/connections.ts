@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { ttsConnections, voices } from '../db/schema';
+import { t, type Lang } from '../i18n';
 import { deleteSetting, getSetting } from './settings';
 
 export type ConnectionRow = typeof ttsConnections.$inferSelect;
@@ -16,12 +17,12 @@ export function getConnection(db: Db, id: string): ConnectionRow | undefined {
   return db.select().from(ttsConnections).where(eq(ttsConnections.id, id)).get();
 }
 
-export function createConnection(db: Db, c: { id: string; label?: string; baseUrl: string; apiKey?: string; model: string }): ConnectionRow {
-  if (!SLUG_RE.test(c.id)) throw new Error('Geçersiz bağlantı adı: küçük harf/rakam/tire, 2-32 karakter (ör. "alltalk-lokal")');
-  if (RESERVED_PROVIDERS.includes(c.id)) throw new Error(`"${c.id}" rezerve bir sağlayıcı adı — başka bir ad seçin`);
-  if (getConnection(db, c.id)) throw new Error('Bu adla bir bağlantı zaten var');
-  try { new URL(c.baseUrl); } catch { throw new Error('Geçersiz URL (ör. http://localhost:8000/v1)'); }
-  if (!c.model.trim()) throw new Error('model gerekli (ör. tts-1)');
+export function createConnection(db: Db, c: { id: string; label?: string; baseUrl: string; apiKey?: string; model: string }, lang: Lang = 'tr'): ConnectionRow {
+  if (!SLUG_RE.test(c.id)) throw new Error(t(lang, 'error.invalidConnectionName'));
+  if (RESERVED_PROVIDERS.includes(c.id)) throw new Error(t(lang, 'error.reservedProviderName', { id: c.id }));
+  if (getConnection(db, c.id)) throw new Error(t(lang, 'error.connectionNameTaken'));
+  try { new URL(c.baseUrl); } catch { throw new Error(t(lang, 'error.invalidUrl')); }
+  if (!c.model.trim()) throw new Error(t(lang, 'error.modelRequired'));
   const now = Date.now();
   const row: ConnectionRow = {
     id: c.id, label: c.label?.trim() || c.id, baseUrl: c.baseUrl.trim(),

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createDb, setDbForTests, type Db } from '@/lib/db/client';
 import { createProject } from '@/lib/services/projects';
 import { createChapter } from '@/lib/services/chapters';
@@ -12,7 +13,7 @@ import * as progressRoute from '@/app/api/progress/[chapterId]/route';
 const FIXTURE = readFileSync('fixtures/sample-tr.json', 'utf8');
 const ctx = (chapterId: string) => ({ params: Promise.resolve({ chapterId }) });
 const jsonReq = (method: string, body?: unknown) =>
-  new Request('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  new NextRequest('http://p', { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 let db: Db, chapterId: string;
 beforeEach(async () => {

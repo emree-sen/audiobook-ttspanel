@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { deleteSetting, getSetting, setSetting } from '@/lib/services/settings';
 import { getConnection, listConnections } from '@/lib/services/connections';
 import { listVoices } from '@/lib/services/voices';
 import { quotaLimit } from '@/lib/services/quota';
+import { tServer } from '@/lib/i18n/server';
 
 function maskKey(v: string): string { return v.length <= 4 ? '••••' : `••••${v.slice(-4)}`; }
 
@@ -38,13 +39,13 @@ const putSchema = z.object({
   quotaLimits: z.record(z.number().int().positive().nullable()).optional(),
 }).strict();
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
   const db = getDb();
   const parsed = putSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: 'Geçersiz gövde' }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: tServer(req, 'error.invalidBody') }, { status: 400 });
   const b = parsed.data;
   if (b.provider && !['gemini', 'piper', 'mock'].includes(b.provider) && !getConnection(db, b.provider))
-    return NextResponse.json({ error: `Bilinmeyen sağlayıcı: "${b.provider}"` }, { status: 400 });
+    return NextResponse.json({ error: tServer(req, 'error.unknownProvider', { provider: b.provider }) }, { status: 400 });
   const setOrDelete = (key: string, value: string | undefined) => {
     if (value === undefined) return;
     if (value) setSetting(db, key, value); else deleteSetting(db, key);

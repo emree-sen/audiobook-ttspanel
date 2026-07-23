@@ -1,4 +1,5 @@
 import type { Db } from '../db/client';
+import { t, type Lang } from '../i18n';
 import { getSetting } from './settings';
 import { getChapter } from './chapters';
 import { latestScript, saveScript } from './scripts';
@@ -18,18 +19,18 @@ export interface AnnotateOutcome {
 
 const CHUNK_TARGET = 12_000; // karakter; Gemini flash çıktı limitine güvenli mesafe
 
-export function llmAdapterFromSettings(db: Db): LlmAdapter {
+export function llmAdapterFromSettings(db: Db, lang: Lang = 'tr'): LlmAdapter {
   const provider = getSetting(db, 'llm_provider') ?? process.env.LLM_PROVIDER ?? 'gemini';
   if (provider === 'mock') return new MockLlmAdapter();
   const key = geminiApiKey(db);
-  if (!key) throw new Error('Gemini API anahtarı yok — Ayarlar’dan girin veya .env GEMINI_API_KEY tanımlayın');
+  if (!key) throw new Error(t(lang, 'error.geminiKeyMissing'));
   return new GeminiLlmAdapter(key, getSetting(db, 'llm_model') ?? process.env.LLM_MODEL);
 }
 
 // Paragraf sınırından ~target karakterlik parçalar; çoğu bölüm tek parça.
-export function chunkText(raw: string, target = CHUNK_TARGET): string[] {
+export function chunkText(raw: string, target = CHUNK_TARGET, lang: Lang = 'tr'): string[] {
   const text = raw.trim();
-  if (!text) throw new Error('Bölüm metni boş — önce ham metni kaydedin');
+  if (!text) throw new Error(t(lang, 'error.chapterTextEmpty'));
   if (text.length <= target) return [text];
   const chunks: string[] = [];
   let cur = '';
@@ -65,7 +66,7 @@ export function mergeSegments<T extends { speaker: string; type: string; text: s
 }
 
 // Tek chunk: LLM çağrısı + zod doğrulama; hatada 1 retry (hata özeti sistem prompt'a eklenir).
-async function annotateChunk(adapter: LlmAdapter, system: string, user: string): Promise<{ chunk: LlmChunk; usage: { inputTokens: number; outputTokens: number } }> {
+async function annotateChunk(adapter: LlmAdapter, system: string, user: string, lang: Lang = 'tr'): Promise<{ chunk: LlmChunk; usage: { inputTokens: number; outputTokens: number } }> {
   let lastErr = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     const sys = attempt === 1 ? system : `${system}\n\nÖNCEKİ DENEMENİN HATASI: ${lastErr}\nŞemaya birebir uy, yalnızca JSON döndür.`;
@@ -76,24 +77,25 @@ async function annotateChunk(adapter: LlmAdapter, system: string, user: string):
       lastErr = e instanceof Error ? e.message : String(e);
     }
   }
-  throw new Error(`LLM çıktısı doğrulanamadı: ${lastErr}`);
+  throw new Error(t(lang, 'error.llmOutputInvalid', { error: lastErr }));
 }
 
 // Ham metin + tarz + ses modu → LLM → doğrulanmış script (scripts.source='llm').
 export async function annotateChapter(
   db: Db, chapterId: string, adapter: LlmAdapter,
-  opts?: { instruction?: string; onProgress?: (done: number, total: number) => void },
+  opts?: { instruction?: string; onProgress?: (done: number, total: number) => void; lang?: Lang },
 ): Promise<AnnotateOutcome> {
+  const lang = opts?.lang ?? 'tr';
   const chapter = getChapter(db, chapterId);
-  if (!chapter) throw new Error('Bölüm bulunamadı');
+  if (!chapter) throw new Error(t(lang, 'error.chapterNotFound'));
   const voiceMode = chapter.voiceMode === 'multi' ? ('multi' as const) : ('narrator' as const);
-  const chunks = chunkText(chapter.rawText);
+  const chunks = chunkText(chapter.rawText, undefined, lang);
 
   // Havuz aktif TTS sağlayıcısından; mock test altyapısıdır, gemini havuzunu kullanır.
   const providerName = activeProvider(db).name;
   const pool = loadPool(db, providerName === 'mock' ? 'gemini' : providerName);
   const narratorVoice = getSetting(db, 'default_voice') ?? pool[0]?.voiceId;
-  if (!narratorVoice) throw new Error('Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin');
+  if (!narratorVoice) throw new Error(t(lang, 'error.voicePoolEmpty'));
 
   // Yeniden üretimde önceki denemenin kısa özeti prompt'a girer.
   let prevSummary: string | undefined;
@@ -116,7 +118,7 @@ export async function annotateChapter(
       knownCast: knownCast.length ? knownCast : undefined,
       instruction: opts?.instruction, prevSummary,
     });
-    const { chunk, usage } = await annotateChunk(adapter, system, buildUserPrompt(chunks[i], i, chunks.length));
+    const { chunk, usage } = await annotateChunk(adapter, system, buildUserPrompt(chunks[i], i, chunks.length), lang);
     for (const c of chunk.cast) if (!knownCast.some((k) => k.character_id === c.character_id)) knownCast.push(c); // ilk kazanır
     allSegments.push(...chunk.segments);
     for (const p of chunk.pronunciations) if (!pron.has(p.term)) pron.set(p.term, p.say_as);

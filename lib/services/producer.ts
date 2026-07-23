@@ -5,6 +5,7 @@ import type { Db } from '../db/client';
 import { audioCache, jobs, renders, segments } from '../db/schema';
 import { newId } from '../id';
 import { audioDir } from '../config';
+import { t, type Lang } from '../i18n';
 import { getChapter, updateChapter } from './chapters';
 import { latestScript, listSegments } from './scripts';
 import { activeProvider, recordCall, remainingToday } from './quota';
@@ -25,9 +26,9 @@ function setJob(db: Db, id: string, patch: Partial<JobRow>): void {
 }
 
 // Bölüm için yeni iş kuyruklar; aktif işi iptal eder, segment durumlarını sıfırlar.
-export function enqueueJob(db: Db, chapterId: string, opts?: { limitCalls?: number }): JobRow {
+export function enqueueJob(db: Db, chapterId: string, opts?: { limitCalls?: number; lang?: Lang }): JobRow {
   const scr = latestScript(db, chapterId);
-  if (!scr) throw new Error('Bölümün script’i yok — önce script üretin');
+  if (!scr) throw new Error(t(opts?.lang ?? 'tr', 'error.noScriptGenerateFirst'));
   const now = Date.now();
   db.update(jobs).set({ status: 'canceled', updatedAt: now })
     .where(and(eq(jobs.chapterId, chapterId), inArray(jobs.status, ['queued', 'running']))).run();
@@ -44,8 +45,8 @@ export function enqueueJob(db: Db, chapterId: string, opts?: { limitCalls?: numb
 }
 
 // done segmentlerin dosyalarından bölüm mp3'ü birleştirir (pauseAfterMs korunur).
-export async function stitchChapter(db: Db, chapterId: string, scriptId: string): Promise<{ renderId: string; renderPath: string; durationSec: number }> {
-  const { plan } = planChapter(db, chapterId, scriptId);
+export async function stitchChapter(db: Db, chapterId: string, scriptId: string, lang: Lang = 'tr'): Promise<{ renderId: string; renderPath: string; durationSec: number }> {
+  const { plan } = planChapter(db, chapterId, scriptId, lang);
   const parts: { wav: Buffer; pauseAfterMs?: number }[] = [];
   let totalMs = 0;
   for (const row of listSegments(db, scriptId)) {
@@ -56,7 +57,7 @@ export async function stitchChapter(db: Db, chapterId: string, scriptId: string)
       totalMs += c?.durationMs ?? 0;
     }
   }
-  if (parts.length === 0) throw new Error('Hiç segment üretilemedi');
+  if (parts.length === 0) throw new Error(t(lang, 'job.noSegmentsProduced'));
   const mp3 = await wavToMp3(concatSegmentsToWav(parts));
   const renderId = newId('rnd');
   const relPath = `${chapterId}/${renderId}.mp3`;
@@ -67,14 +68,14 @@ export async function stitchChapter(db: Db, chapterId: string, scriptId: string)
 }
 
 // Birleştirme artık bilinçli bir adım: en güncel script'in done segmentlerinden mp3 üretir.
-export async function stitchLatest(db: Db, chapterId: string): Promise<{ renderId: string; renderPath: string; durationSec: number }> {
+export async function stitchLatest(db: Db, chapterId: string, lang: Lang = 'tr'): Promise<{ renderId: string; renderPath: string; durationSec: number }> {
   const scr = latestScript(db, chapterId);
-  if (!scr) throw new Error('Bölümün script’i yok — önce script üretin');
+  if (!scr) throw new Error(t(lang, 'error.noScriptGenerateFirst'));
   const active = db.select().from(jobs)
     .where(and(eq(jobs.chapterId, chapterId), inArray(jobs.status, ['queued', 'running']))).get();
-  if (active) throw new Error('Bölümde aktif bir üretim işi var — bitmesini bekleyin');
-  if (!listSegments(db, scr.id).some((s) => s.status === 'done')) throw new Error('Birleştirilecek üretilmiş segment yok');
-  const st = await stitchChapter(db, chapterId, scr.id);
+  if (active) throw new Error(t(lang, 'error.activeJobWait'));
+  if (!listSegments(db, scr.id).some((s) => s.status === 'done')) throw new Error(t(lang, 'error.noProducedSegmentsToStitch'));
+  const st = await stitchChapter(db, chapterId, scr.id, lang);
   updateChapter(db, chapterId, { status: 'done' });
   return st;
 }
@@ -158,7 +159,9 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
         setJob(db, job.id, { callsUsed });
       }
     }
-    if (listSegments(db, job.scriptId).every((r) => r.status !== 'done')) throw new Error('Hiç segment üretilemedi');
+    // KN3: worker'ın req bağlamı yok; iş dili şemada saklanmadığından burada varsayılan 'tr' kullanılır
+    // (bkz. docs/superpowers/plans/2026-07-20-panel-i18n.md Task 8 — bilinen sınır, şema değişikliği gerektirir).
+    if (listSegments(db, job.scriptId).every((r) => r.status !== 'done')) throw new Error(t('tr', 'job.noSegmentsProduced'));
     setJob(db, job.id, { status: 'done', doneCount });
     updateChapter(db, job.chapterId, { status: 'voiced' });
   } catch (e) {
@@ -168,10 +171,10 @@ export async function runJob(db: Db, jobId: string, adapter: TtsAdapter): Promis
 }
 
 // Duraklamış işi sürdürülebilir yapar: kullanıcı bilinçli devam etti → tavan kalkar.
-export function resumeJob(db: Db, jobId: string): JobRow {
+export function resumeJob(db: Db, jobId: string, lang: Lang = 'tr'): JobRow {
   const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get();
-  if (!job) throw new Error('İş bulunamadı');
-  if (job.status !== 'queued') throw new Error('İş duraklamış değil');
+  if (!job) throw new Error(t(lang, 'job.jobNotFound'));
+  if (job.status !== 'queued') throw new Error(t(lang, 'job.notPaused'));
   db.update(jobs).set({ limitCalls: null, pausedReason: null, updatedAt: Date.now() }).where(eq(jobs.id, jobId)).run();
   return db.select().from(jobs).where(eq(jobs.id, jobId)).get()!;
 }
@@ -209,16 +212,16 @@ export function ensureWorker(db: Db): Promise<void> {
 }
 
 // Tek segmenti yeniden üretir (cache'i üzerine yazar). Birleştirme ayrı bir adımdır (stitchLatest).
-export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsAdapter): Promise<{ segmentId: string; status: string }> {
+export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsAdapter, lang: Lang = 'tr'): Promise<{ segmentId: string; status: string }> {
   const row = db.select().from(segments).where(eq(segments.id, segmentId)).get();
-  if (!row) throw new Error('Segment bulunamadı');
+  if (!row) throw new Error(t(lang, 'error.segmentNotFound'));
   const active = db.select().from(jobs)
     .where(and(eq(jobs.chapterId, row.chapterId), inArray(jobs.status, ['queued', 'running']))).get();
-  if (active) throw new Error('Bölümde aktif bir üretim işi var — önce bitmesini/duraklamasını iptal edin');
+  if (active) throw new Error(t(lang, 'error.activeJobCancelFirst'));
   const { name: provider, model } = activeProvider(db);
   const rem = remainingToday(db, provider);
-  if (rem != null && rem <= 0) throw new Error('Bugünkü kota doldu — yarın tekrar deneyin');
-  const { script, plan } = planChapter(db, row.chapterId, row.scriptId);
+  if (rem != null && rem <= 0) throw new Error(t(lang, 'error.dailyQuotaReached'));
+  const { script, plan } = planChapter(db, row.chapterId, row.scriptId, lang);
   const item = plan[row.idx];
   try {
     const { result: res, attempts } = await synthesizeChecked(adapter, {
@@ -230,7 +233,7 @@ export async function regenerateSegment(db: Db, segmentId: string, adapter: TtsA
     await saveSegmentAudio(db, row.id, item.hash, res.audio, res.durationMs, res.cost.usd ?? 0);
   } catch (e) {
     recordCall(db, { provider, model, segmentId: row.id, ok: false });
-    throw new Error(`Segment üretilemedi: ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(t(lang, 'error.segmentGenerationFailed', { message: e instanceof Error ? e.message : String(e) }));
   }
   // Birleştirme kullanıcının elinde; mevcut mp3 bayatladıysa bölüm voiced'a döner.
   if (getChapter(db, row.chapterId)?.status === 'done') updateChapter(db, row.chapterId, { status: 'voiced' });

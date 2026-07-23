@@ -28,3 +28,10 @@ export function resolveLang(cookieValue: string | undefined, acceptLanguage: str
 export function format(msg: string, params: Record<string, string | number>): string {
   return msg.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
 }
+
+// req'siz katmanlar (servisler) için: dil, çağıran (route) tarafından istek anında
+// resolveLang ile belirlenip parametre olarak taşınır — burada yeniden çözülmez.
+export function t(lang: Lang, key: MessageKey, params?: Record<string, string | number>): string {
+  const msg = getDict(lang)[key];
+  return params ? format(msg, params) : msg;
+}
