@@ -53,6 +53,7 @@ geçiyor. Detaylar:
 - Public repo cilası (README/LICENSE): `docs/superpowers/specs/2026-07-20-public-repo-readme-design.md`
 - Dilim E (lokal modeller: OpenAI-uyumlu LLM + XTTS sunucusu): `docs/superpowers/specs/2026-07-23-panel-slice-e-local-models-design.md`
 - Dilim F (kolay kurulum: preset/sına/run.sh/sidecar): `docs/superpowers/specs/2026-07-23-panel-slice-f-easy-setup-design.md`
+- Dilim G (rehberli kurulum: hızlı kurulum kartı, akıllı preset, model seçici, wav yükleme): `docs/superpowers/specs/2026-07-23-panel-slice-g-guided-setup-design.md`
 
 ## Nasıl çalıştırılır
 
@@ -91,6 +92,5 @@ Algieba, Algenib, Leda, Schedar, Puck, Kore, Iapetus…
 
 VPS kurulumu + HTTPS (PWA şartı), Gemini faturalama kararı / Chirp adapter'ı,
 cache & renders GC, ses önizleme düğmesi, uyku zamanlayıcısı, PNG manifest ikonları
-(eski Android), stitchLatest hata metni cilası, panelden ses klonlama yönetimi
-(XTTS referans wav yükleme UI'ı), ElevenLabs adapter'ı, LLM anahtarı "kayıtlı"
-rozeti (ayarlar).
+(eski Android), stitchLatest hata metni cilası, ElevenLabs adapter'ı, LLM anahtarı
+"kayıtlı" rozeti (ayarlar).

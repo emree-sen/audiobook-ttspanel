@@ -103,9 +103,13 @@ Run both the annotation LLM and TTS on your own machine — nothing leaves it.
    sets everything up on first run, or press **Start** on the XTTS server card in
    Settings. Then add the connection with the **Add XTTS server** preset button
    (or manually: address `http://localhost:8020/v1`, any model name) and voices
-   named after your reference WAV files.
+   named after your reference WAV files. You can upload reference voices from the
+   panel (Settings → XTTS server → Reference voices) — no filesystem access needed.
    *Lighter alternative:* [Piper](https://github.com/OHF-Voice/piper1-gpl) is built in —
    fast even on CPU, at the cost of a flatter voice.
+
+   The *Quick setup* card at the top of Settings shows the status of all three steps
+   (LLM, TTS, voice pool) and jumps to the right card.
 3. Prefer cloud quality later? Just switch the provider back in Settings —
    local and API providers coexist.
 

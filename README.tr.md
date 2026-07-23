@@ -103,9 +103,13 @@ Hem annotation LLM'ini hem TTS'i kendi makinende çalıştır — hiçbir veri d
    ilk çalıştırmada her şeyi kurar; ya da Ayarlar'daki XTTS sunucusu kartından
    **Başlat**'a bas. Sonra **XTTS sunucusu ekle** preset düğmesiyle bağlantıyı ekle
    (veya elle: adres `http://localhost:8020/v1`, herhangi bir model adı) ve referans
-   WAV dosya adlarıyla sesleri tanımla.
+   WAV dosya adlarıyla sesleri tanımla. Referans sesleri panelden yükleyebilirsin
+   (Ayarlar → XTTS sunucusu → Referans sesler) — dosya sistemine girmek gerekmez.
    *Hafif alternatif:* [Piper](https://github.com/OHF-Voice/piper1-gpl) yerleşik —
    CPU'da bile hızlı, karşılığında daha düz bir ses.
+
+   Ayarlar'ın tepesindeki *Hızlı kurulum* kartı üç adımın (LLM, TTS, ses havuzu)
+   durumunu gösterir ve doğru karta atlar.
 3. Sonradan bulut kalitesi mi istedin? Ayarlar'dan sağlayıcıyı değiştirmen yeter —
    lokal ve API sağlayıcıları bir arada yaşar.
 
