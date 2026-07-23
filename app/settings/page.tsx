@@ -182,13 +182,14 @@ export default function SettingsPage() {
     setErr('');
     const cur = data;
     if (!cur) return;
-    const alreadyConnected = cur.connections.some((c) => c.id === 'xtts');
-    if (!alreadyConnected) {
-      const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl: 'http://localhost:8020/v1', model: 'xtts-v2' }) });
+    const existing = cur.connections.find((c) => c.id === 'xtts');
+    const baseUrl = existing?.baseUrl ?? 'http://localhost:8020/v1';
+    if (!existing) {
+      const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl, model: 'xtts-v2' }) });
       if (!res.ok) { setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.connectionAddError')); return; }
       await put({ provider: 'xtts' }); // yalnız yeni bağlantıda aktif sağlayıcıyı da geçir — yeni kullanıcı tuzağı #2; eşitleme (mevcut bağlantı) sağlayıcıyı değiştirmez
     }
-    const pr = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'tts', baseUrl: 'http://localhost:8020/v1' }) });
+    const pr = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'tts', baseUrl }) });
     const d = await pr.json().catch(() => ({ ok: false, detail: '?', voices: [] as string[] }));
     if (d.ok) {
       const fresh: SettingsData = await (await fetch('/api/settings')).json(); // eşitleme öncesi güncel havuz (stale state'e karşı)
@@ -294,7 +295,7 @@ export default function SettingsPage() {
         ))}
         <div className="row">
           <button type="button" className="ghost" onClick={setupXtts}>
-            <Icon name="plus" /> {data.connections.some((c) => c.id === 'xtts') ? t('settings.xttsSyncVoices') : t('settings.xttsPresetButton')} {detected.xtts && <span className="badge">{t('settings.detectedBadge')}</span>}
+            <Icon name="plus" /> {data.connections.some((c) => c.id === 'xtts') ? t('settings.xttsSyncVoices') : t('settings.xttsPresetButton')} {!data.connections.some((c) => c.id === 'xtts') && detected.xtts && <span className="badge">{t('settings.detectedBadge')}</span>}
           </button>
           {probeMsg.xtts && <span className="muted">{probeMsg.xtts}</span>}
           <span className="muted">{t('settings.presetHint')}</span>
