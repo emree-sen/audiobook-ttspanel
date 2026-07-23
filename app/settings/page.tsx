@@ -86,6 +86,18 @@ export default function SettingsPage() {
   const [conn, setConn] = useState({ id: '', label: '', baseUrl: '', apiKey: '', model: '' });
   const [probeMsg, setProbeMsg] = useState<Record<string, string>>({}); // anahtar: 'llm' | bağlantı id'si
   const [detected, setDetected] = useState<Record<string, boolean>>({});
+  const [xtts, setXtts] = useState<{ state: string; log: string[]; exitInfo: string; voices: string[] }>({ state: 'stopped', log: [], exitInfo: '', voices: [] });
+
+  const refreshXtts = useCallback(async () => {
+    const res = await fetch('/api/xtts');
+    if (res.ok) setXtts(await res.json());
+  }, []);
+  useEffect(() => { refreshXtts(); }, [refreshXtts]);
+  useEffect(() => {
+    if (xtts.state !== 'starting' && xtts.state !== 'running') return;
+    const id = setInterval(refreshXtts, 2000);
+    return () => clearInterval(id);
+  }, [xtts.state, refreshXtts]);
 
   async function probe(kind: 'llm' | 'tts', baseUrl: string, msgKey: string) {
     const res = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, baseUrl }) });
@@ -249,6 +261,27 @@ export default function SettingsPage() {
         </form>
         <p className="muted">{t('settings.piperReadmeHint')}</p>
         <VoicePool provider="piper" rows={data.voices.piper ?? []} withPath reload={load} onError={setErr} />
+      </div>
+
+      <div className="card">
+        <h2><Icon name="speaker" /> {t('settings.xttsHeading')}</h2>
+        <div className="row">
+          {xtts.state === 'stopped' || xtts.state === 'error' ? (
+            <button onClick={async () => { await fetch('/api/xtts', { method: 'POST' }); await refreshXtts(); }}>{t('settings.xttsStart')}</button>
+          ) : (
+            <button className="ghost" onClick={async () => { await fetch('/api/xtts', { method: 'DELETE' }); await refreshXtts(); }}>{t('settings.xttsStop')}</button>
+          )}
+          <span className="muted">
+            {xtts.state === 'stopped' && t('settings.xttsState.stopped')}
+            {xtts.state === 'starting' && t('settings.xttsState.starting')}
+            {xtts.state === 'running' && t('settings.xttsState.running', { count: xtts.voices.length })}
+            {xtts.state === 'error' && t('settings.xttsState.error', { detail: xtts.exitInfo })}
+          </span>
+        </div>
+        {xtts.log.length > 0 && xtts.state !== 'stopped' && (
+          <pre className="muted" style={{ maxHeight: '8rem', overflow: 'auto', fontSize: '0.75rem' }}>{xtts.log.slice(-12).join('\n')}</pre>
+        )}
+        <p className="muted">{t('settings.xttsHint')}</p>
       </div>
 
       <div className="card">
