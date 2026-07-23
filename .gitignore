@@ -28,6 +28,8 @@ yarn-error.log*
 /bakeoff/
 *.mp3
 *.wav
+tools/xtts-server/voices/*.wav
+tools/xtts-server/.venv/
 
 # Local/generated voiceover scripts (may contain copyrighted source text)
 /scripts/
