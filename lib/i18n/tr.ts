@@ -233,6 +233,8 @@ export const tr = {
   'probe.okVoices': 'bağlandı — {count} ses',
   'probe.httpError': 'sunucu hata döndürdü (HTTP {status})',
   'probe.unreachable': 'ulaşılamadı — sunucu çalışıyor mu?',
+  'xtts.alreadyRunning': 'XTTS sunucusu zaten çalışıyor',
+  'xtts.notRunning': 'XTTS sunucusu çalışmıyor',
   'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;

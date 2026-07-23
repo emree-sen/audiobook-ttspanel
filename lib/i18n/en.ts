@@ -233,5 +233,7 @@ export const en: Record<MessageKey, string> = {
   'probe.okVoices': 'connected — {count} voices',
   'probe.httpError': 'server returned an error (HTTP {status})',
   'probe.unreachable': 'unreachable — is the server running?',
+  'xtts.alreadyRunning': 'XTTS server is already running',
+  'xtts.notRunning': 'XTTS server is not running',
   'cast.narrator': 'Narrator',
 };
