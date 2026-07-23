@@ -182,11 +182,12 @@ export default function SettingsPage() {
     setErr('');
     const cur = data;
     if (!cur) return;
-    if (!cur.connections.some((c) => c.id === 'xtts')) {
+    const alreadyConnected = cur.connections.some((c) => c.id === 'xtts');
+    if (!alreadyConnected) {
       const res = await fetch('/api/connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'xtts', baseUrl: 'http://localhost:8020/v1', model: 'xtts-v2' }) });
       if (!res.ok) { setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.connectionAddError')); return; }
+      await put({ provider: 'xtts' }); // yalnız yeni bağlantıda aktif sağlayıcıyı da geçir — yeni kullanıcı tuzağı #2; eşitleme (mevcut bağlantı) sağlayıcıyı değiştirmez
     }
-    await put({ provider: 'xtts' }); // aktif sağlayıcıyı da geçir — yeni kullanıcı tuzağı #2
     const pr = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'tts', baseUrl: 'http://localhost:8020/v1' }) });
     const d = await pr.json().catch(() => ({ ok: false, detail: '?', voices: [] as string[] }));
     if (d.ok) {
@@ -348,7 +349,7 @@ export default function SettingsPage() {
           {xttsFiles.map((f) => (
             <div key={f} className="rowitem">
               <span className="mono">{f}</span>
-              <ConfirmButton onConfirm={async () => { await fetch(`/api/xtts/voices/${encodeURIComponent(f)}`, { method: 'DELETE' }); await refreshXttsFiles(); }} ariaLabel={t('settings.deleteVoice')} />
+              <ConfirmButton onConfirm={async () => { await fetch(`/api/xtts/voices/${encodeURIComponent(f)}`, { method: 'DELETE' }); await refreshXttsFiles(); await load(); }} ariaLabel={t('settings.deleteVoice')} />
             </div>
           ))}
           <input type="file" accept=".wav" aria-label={t('settings.xttsUploadAria')} onChange={async (e) => {
@@ -392,7 +393,7 @@ export default function SettingsPage() {
       <div className="card" id="card-llm">
         <h2><Icon name="doc" /> {t('settings.llmHeading')}</h2>
         <div className="row">
-          <select value={data.llmProvider} onChange={(e) => put({ llmProvider: e.target.value })} aria-label={t('settings.llmProviderAria')}>
+          <select value={data.llmProvider} onChange={(e) => { setLlmModels([]); put({ llmProvider: e.target.value }); }} aria-label={t('settings.llmProviderAria')}>
             <option value="gemini">Gemini</option>
             <option value="openai-compat">{t('settings.llmOpenaiCompat')}</option>
             <option value="mock">{t('settings.mockTest')}</option>
@@ -413,7 +414,7 @@ export default function SettingsPage() {
           {probeMsg.llm && <span className="muted">{probeMsg.llm}</span>}
         </div>
         {llmModels.length > 0 && (
-          <select aria-label={t('settings.llmProviderAria')} value="" onChange={async (e) => { const v = e.target.value; if (v) { setLlmModelInput(v); await put({ llmModel: v }); } }}>
+          <select aria-label={t('settings.llmModelAria')} value="" onChange={async (e) => { const v = e.target.value; if (v) { setLlmModelInput(v); await put({ llmModel: v }); } }}>
             <option value="">{t('settings.llmModelPick')}</option>
             {llmModels.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>

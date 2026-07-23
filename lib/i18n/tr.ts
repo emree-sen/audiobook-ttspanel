@@ -192,6 +192,7 @@ export const tr = {
   'settings.quickReady': 'Kurulum tamam — üretime hazırsın.',
   'settings.xttsSyncVoices': 'Sesleri eşitle',
   'settings.llmModelPick': 'model seç…',
+  'settings.llmModelAria': 'LLM modeli',
   'settings.xttsUploadAria': 'Referans ses yükle',
   'settings.xttsVoicesHint': 'Referans kayıt: 6-30 sn temiz ses; dosya adı = panel/ses adı. Yükleme çalışan sunucuya anında yansır.',
   // API mesajları (tServer / t) — Task 8

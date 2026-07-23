@@ -192,6 +192,7 @@ export const en: Record<MessageKey, string> = {
   'settings.quickReady': 'Setup complete — ready to produce.',
   'settings.xttsSyncVoices': 'Sync voices',
   'settings.llmModelPick': 'pick a model…',
+  'settings.llmModelAria': 'LLM model',
   'settings.xttsUploadAria': 'Upload reference voice',
   'settings.xttsVoicesHint': 'Reference recording: 6-30 s of clean audio; file name = voice name. Uploads apply to a running server instantly.',
   // API messages (tServer / t) — Task 8
