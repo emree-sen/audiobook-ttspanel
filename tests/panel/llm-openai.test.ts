@@ -75,4 +75,22 @@ describe('OpenAiCompatLlmAdapter', () => {
     await expect(new OpenAiCompatLlmAdapter({ baseUrl: 'http://x/v1', model: 'm' }).annotate({ system: 's', user: 'u' }))
       .rejects.toThrow(/boş/);
   });
+
+  test('fetch reddi (sunucu kapalı) anlaşılır mesajla fırlar', async () => {
+    vi.stubGlobal('fetch', async () => { throw new TypeError('fetch failed'); });
+    await expect(new OpenAiCompatLlmAdapter({ baseUrl: 'http://x/v1', model: 'm' }).annotate({ system: 's', user: 'u' }))
+      .rejects.toThrow(/bağlanılamadı/);
+  });
+
+  test('JSON olmayan gövde çözümlenemedi mesajıyla fırlar', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => { throw new SyntaxError('Unexpected token'); }, text: async () => '' }));
+    await expect(new OpenAiCompatLlmAdapter({ baseUrl: 'http://x/v1', model: 'm' }).annotate({ system: 's', user: 'u' }))
+      .rejects.toThrow(/çözümlenemedi/);
+  });
+
+  test('gövde null ise boş content hatasına düşer', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => null, text: async () => '' }));
+    await expect(new OpenAiCompatLlmAdapter({ baseUrl: 'http://x/v1', model: 'm' }).annotate({ system: 's', user: 'u' }))
+      .rejects.toThrow(/boş/);
+  });
 });

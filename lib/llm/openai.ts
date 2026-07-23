@@ -20,20 +20,34 @@ export class OpenAiCompatLlmAdapter implements LlmAdapter {
 
   async annotate(req: LlmAnnotateRequest): Promise<{ json: unknown; usage: LlmUsage }> {
     // json_object bazı sunucularda desteklenmez: 4xx dönerse alansız bir deneme daha.
-    let res = await this.post(req, true);
-    if (!res.ok && res.status >= 400 && res.status < 500) res = await this.post(req, false);
+    let res = await this.postChecked(req, true);
+    if (!res.ok && res.status >= 400 && res.status < 500) res = await this.postChecked(req, false);
     if (!res.ok) {
       const body = (await res.text().catch(() => '')).slice(0, 200);
       throw new Error(`LLM sunucusu hata döndürdü (HTTP ${res.status}): ${body || 'gövde yok'}`);
     }
-    const data = await res.json();
-    const content: string = data.choices?.[0]?.message?.content ?? '';
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error('LLM yanıtı JSON olarak çözümlenemedi');
+    }
+    const content: string = (data as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? '';
     if (!content) throw new Error('LLM yanıtı boş (choices[0].message.content yok)');
-    const u = data.usage;
+    const u = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number } })?.usage;
     return {
       json: extractJson(stripLlmWrappers(content)),
       usage: { inputTokens: u?.prompt_tokens ?? 0, outputTokens: u?.completion_tokens ?? 0 },
     };
+  }
+
+  // fetch ağ seviyesinde reddedebilir (sunucu ayakta değil, DNS vb.); okunur Türkçe mesaja çevir.
+  private async postChecked(req: LlmAnnotateRequest, jsonMode: boolean): Promise<Response> {
+    try {
+      return await this.post(req, jsonMode);
+    } catch {
+      throw new Error(`LLM sunucusuna bağlanılamadı (${this.cfg.baseUrl}) — sunucunun çalıştığından emin olun`);
+    }
   }
 
   private post(req: LlmAnnotateRequest, jsonMode: boolean): Promise<Response> {
