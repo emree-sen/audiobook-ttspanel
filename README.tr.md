@@ -89,6 +89,26 @@ ayarla — tüm hat sessiz yer tutucu dosyalarla çalışır.
 
 Üretim (production) için: `npm run build && npm start` (PWA/çevrimdışı özellikler için de şart).
 
+## Tamamen lokal kurulum (API anahtarsız)
+
+Hem annotation LLM'ini hem TTS'i kendi makinende çalıştır — hiçbir veri dışarı çıkmaz.
+
+1. **LLM — LM Studio** (veya Ollama, ya da OpenAI-uyumlu herhangi bir sunucu):
+   bir model yükle (ör. `openai/gpt-oss-20b`) ve lokal sunucuyu başlat
+   (LM Studio `http://localhost:1234/v1` adresinde sunar).
+   **Ayarlar → LLM**'den *OpenAI-uyumlu*'yu seç, adres ve model adını gir.
+2. **TTS — XTTS-v2** (doğal, ses klonlamalı, Türkçe destekli):
+   bkz. [`tools/xtts-server/`](tools/xtts-server/README.md). Başlat, sonra
+   **Ayarlar**'dan `http://localhost:8020/v1` adresiyle bağlantı ekle ve referans
+   WAV dosya adlarıyla sesleri tanımla.
+   *Hafif alternatif:* [Piper](https://github.com/rhasspy/piper) yerleşik —
+   CPU'da bile hızlı, karşılığında daha düz bir ses.
+3. Sonradan bulut kalitesi mi istedin? Ayarlar'dan sağlayıcıyı değiştirmen yeter —
+   lokal ve API sağlayıcıları bir arada yaşar.
+
+Lisans notu: XTTS-v2 model ağırlıkları Coqui CPML (ticari olmayan) lisanslıdır;
+bu repo MIT kalır ve ağırlıkları içermez.
+
 ## TTS sağlayıcıları
 
 | Sağlayıcı | Maliyet | Duygu/stil | Notlar |
