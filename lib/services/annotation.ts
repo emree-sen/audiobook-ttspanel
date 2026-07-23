@@ -25,9 +25,9 @@ export function llmAdapterFromSettings(db: Db, lang: Lang = 'tr'): LlmAdapter {
   if (provider === 'mock') return new MockLlmAdapter();
   if (provider === 'openai-compat') {
     const baseUrl = getSetting(db, 'llm_base_url') ?? process.env.LLM_BASE_URL;
-    if (!baseUrl) throw new Error('LLM sunucu adresi yok — Ayarlar’dan girin veya .env LLM_BASE_URL tanımlayın');
+    if (!baseUrl) throw new Error(t(lang, 'error.llmBaseUrlMissing'));
     const model = getSetting(db, 'llm_model') ?? process.env.LLM_MODEL;
-    if (!model) throw new Error('LLM model adı yok — Ayarlar’dan girin veya .env LLM_MODEL tanımlayın');
+    if (!model) throw new Error(t(lang, 'error.llmModelMissing'));
     return new OpenAiCompatLlmAdapter({ baseUrl, apiKey: getSetting(db, 'llm_api_key') ?? process.env.LLM_API_KEY, model });
   }
   const key = geminiApiKey(db);

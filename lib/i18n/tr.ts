@@ -218,6 +218,8 @@ export const tr = {
   'error.chapterTextEmpty': 'Bölüm metni boş — önce ham metni kaydedin',
   'error.voicePoolEmpty': 'Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin',
   'error.llmOutputInvalid': 'LLM çıktısı doğrulanamadı: {error}',
+  'error.llmBaseUrlMissing': 'LLM sunucu adresi yok — Ayarlar’dan girin veya .env LLM_BASE_URL tanımlayın',
+  'error.llmModelMissing': 'LLM model adı yok — Ayarlar’dan girin veya .env LLM_MODEL tanımlayın',
   'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;
