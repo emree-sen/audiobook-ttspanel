@@ -15,10 +15,10 @@ export async function POST(req: NextRequest) {
   if (!(file instanceof File)) return NextResponse.json({ error: tServer(req, 'error.invalidBody') }, { status: 400 });
   if (!/\.wav$/i.test(file.name)) return NextResponse.json({ error: tServer(req, 'xttsVoices.onlyWav') }, { status: 400 });
   try {
-    const name = saveVoiceFile(file.name, Buffer.from(await file.arrayBuffer()));
+    const lang = langFromRequest(req);
+    const name = saveVoiceFile(file.name, Buffer.from(await file.arrayBuffer()), undefined, lang);
     // xtts bağlantısı varsa havuza da ekle (yoksa sessiz geç; kullanıcı preset'le sonra eşitler)
     const db = getDb();
-    const lang = langFromRequest(req);
     if (getConnection(db, 'xtts') && !listVoices(db, 'xtts').some((v) => v.voice === name)) {
       addVoice(db, { provider: 'xtts', voice: name }, lang);
     }
