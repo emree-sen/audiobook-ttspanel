@@ -38,7 +38,8 @@ dinleme. Elle JSON yapıştırma fallback (aynı şema sözleşme).
 ## Durum
 
 Plan ① (audio core + CLI) ve Dilim A→D + UI redesign tamam; panel uçtan uca çalışıyor.
-Detaylar:
+Dilim E (lokal modeller) kod-tamam; kullanıcı makinesinde uçtan uca doğrulama (LM Studio +
+XTTS) bekliyor. Detaylar:
 
 - Plan ①: `docs/superpowers/plans/2026-07-13-milestone-0-audio-core.md`
 - Dilim A (panel iskeleti): `docs/superpowers/specs/2026-07-16-panel-slice-a-design.md`
@@ -49,6 +50,7 @@ Detaylar:
 - Dilim C3 (üretim akışı): `docs/superpowers/specs/2026-07-18-panel-slice-c3-production-flow-design.md`
 - Dilim D (kütüphane + PWA): `docs/superpowers/specs/2026-07-19-panel-slice-d-library-pwa-player-design.md`
 - Public repo cilası (README/LICENSE): `docs/superpowers/specs/2026-07-20-public-repo-readme-design.md`
+- Dilim E (lokal modeller: OpenAI-uyumlu LLM + XTTS sunucusu): `docs/superpowers/specs/2026-07-23-panel-slice-e-local-models-design.md`
 
 ## Nasıl çalıştırılır
 
@@ -87,4 +89,6 @@ Algieba, Algenib, Leda, Schedar, Puck, Kore, Iapetus…
 
 VPS kurulumu + HTTPS (PWA şartı), Gemini faturalama kararı / Chirp adapter'ı,
 cache & renders GC, ses önizleme düğmesi, uyku zamanlayıcısı, PNG manifest ikonları
-(eski Android), stitchLatest hata metni cilası.
+(eski Android), stitchLatest hata metni cilası, panelden ses klonlama yönetimi
+(XTTS referans wav yükleme UI'ı), ElevenLabs adapter'ı, LLM anahtarı "kayıtlı"
+rozeti (ayarlar).
