@@ -49,3 +49,6 @@ Thumbs.db
 
 # SDD scratch
 .superpowers/
+
+# tsc incremental artığı
+tsconfig.tsbuildinfo
