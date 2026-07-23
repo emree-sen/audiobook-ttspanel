@@ -218,5 +218,6 @@ export const tr = {
   'error.chapterTextEmpty': 'Bölüm metni boş — önce ham metni kaydedin',
   'error.voicePoolEmpty': 'Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin',
   'error.llmOutputInvalid': 'LLM çıktısı doğrulanamadı: {error}',
+  'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;

@@ -34,6 +34,6 @@ export function extractJson(text: string): unknown {
     // fallback aşağıda
   }
   const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error('LLM yanıtında JSON bulunamadı');
+  if (!m) throw new Error('could not extract JSON from LLM response');
   return JSON.parse(m[0]);
 }

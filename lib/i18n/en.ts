@@ -218,4 +218,5 @@ export const en: Record<MessageKey, string> = {
   'error.chapterTextEmpty': 'Chapter text is empty — save the raw text first',
   'error.voicePoolEmpty': 'The active provider’s voice pool is empty — add a voice in Settings',
   'error.llmOutputInvalid': 'LLM output could not be validated: {error}',
+  'cast.narrator': 'Narrator',
 };

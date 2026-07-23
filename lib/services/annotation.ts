@@ -129,7 +129,7 @@ export async function annotateChapter(
   // Ses ataması: anlatıcı yukarıda hesaplandı; karakterler havuzdan (§2.2).
   const used = new Set<string>([narratorVoice]);
   const cast = [
-    { character_id: 'narrator', display_name: 'Anlatıcı', voice_id: narratorVoice, base_style: chapter.narrationStyle ?? undefined },
+    { character_id: 'narrator', display_name: t(lang, 'cast.narrator'), voice_id: narratorVoice, base_style: chapter.narrationStyle ?? undefined },
     ...(voiceMode === 'multi'
       ? knownCast.filter((c) => c.character_id !== 'narrator').map((c) => ({
           character_id: c.character_id, display_name: c.display_name,
