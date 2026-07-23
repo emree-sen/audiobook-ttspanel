@@ -7,6 +7,7 @@ import { buildSystemPrompt, buildUserPrompt } from '../llm/prompt';
 import { llmChunkSchema, type LlmCast, type LlmChunk } from '../llm/schema';
 import { GeminiLlmAdapter } from '../llm/gemini';
 import { MockLlmAdapter } from '../llm/mock';
+import { OpenAiCompatLlmAdapter } from '../llm/openai';
 import type { LlmAdapter } from '../llm/types';
 import { loadPool, pickVoice } from '../voices-pool';
 import { geminiApiKey } from './generation';
@@ -22,6 +23,13 @@ const CHUNK_TARGET = 12_000; // karakter; Gemini flash çıktı limitine güvenl
 export function llmAdapterFromSettings(db: Db, lang: Lang = 'tr'): LlmAdapter {
   const provider = getSetting(db, 'llm_provider') ?? process.env.LLM_PROVIDER ?? 'gemini';
   if (provider === 'mock') return new MockLlmAdapter();
+  if (provider === 'openai-compat') {
+    const baseUrl = getSetting(db, 'llm_base_url') ?? process.env.LLM_BASE_URL;
+    if (!baseUrl) throw new Error('LLM sunucu adresi yok — Ayarlar’dan girin veya .env LLM_BASE_URL tanımlayın');
+    const model = getSetting(db, 'llm_model') ?? process.env.LLM_MODEL;
+    if (!model) throw new Error('LLM model adı yok — Ayarlar’dan girin veya .env LLM_MODEL tanımlayın');
+    return new OpenAiCompatLlmAdapter({ baseUrl, apiKey: getSetting(db, 'llm_api_key') ?? process.env.LLM_API_KEY, model });
+  }
   const key = geminiApiKey(db);
   if (!key) throw new Error(t(lang, 'error.geminiKeyMissing'));
   return new GeminiLlmAdapter(key, getSetting(db, 'llm_model') ?? process.env.LLM_MODEL);

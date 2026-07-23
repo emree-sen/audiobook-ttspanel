@@ -1,5 +1,8 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { OpenAiCompatLlmAdapter, stripLlmWrappers } from '@/lib/llm/openai';
+import { createDb, setDbForTests, type Db } from '@/lib/db/client';
+import { setSetting } from '@/lib/services/settings';
+import { llmAdapterFromSettings } from '@/lib/services/annotation';
 
 describe('stripLlmWrappers', () => {
   test('düz JSON dokunulmadan döner', () => {
@@ -92,5 +95,29 @@ describe('OpenAiCompatLlmAdapter', () => {
     vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => null, text: async () => '' }));
     await expect(new OpenAiCompatLlmAdapter({ baseUrl: 'http://x/v1', model: 'm' }).annotate({ system: 's', user: 'u' }))
       .rejects.toThrow(/boş/);
+  });
+});
+
+describe('llmAdapterFromSettings — openai-compat', () => {
+  let db: Db;
+  beforeEach(() => { db = createDb(':memory:'); setDbForTests(db); });
+
+  test('adres + model ayarlıysa adapter döner', () => {
+    setSetting(db, 'llm_provider', 'openai-compat');
+    setSetting(db, 'llm_base_url', 'http://localhost:1234/v1');
+    setSetting(db, 'llm_model', 'openai/gpt-oss-20b');
+    expect(llmAdapterFromSettings(db).id).toBe('openai-llm:openai/gpt-oss-20b');
+  });
+
+  test('adres yoksa anlaşılır hata', () => {
+    setSetting(db, 'llm_provider', 'openai-compat');
+    setSetting(db, 'llm_model', 'm');
+    expect(() => llmAdapterFromSettings(db)).toThrow(/LLM sunucu adresi yok/);
+  });
+
+  test('model yoksa anlaşılır hata', () => {
+    setSetting(db, 'llm_provider', 'openai-compat');
+    setSetting(db, 'llm_base_url', 'http://x/v1');
+    expect(() => llmAdapterFromSettings(db)).toThrow(/LLM model adı yok/);
   });
 });
