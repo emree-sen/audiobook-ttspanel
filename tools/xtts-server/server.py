@@ -46,6 +46,13 @@ class SpeechRequest(BaseModel):
     response_format: str = "wav"    # yalnızca wav desteklenir
 
 
+@app.get("/health")
+def health() -> dict:
+    # Sına/durum ucu: panel bağlantı testi ve sidecar kartı bunu okur.
+    device = DEVICE or ("cuda" if torch.cuda.is_available() else "cpu")
+    return {"status": "ok", "voices": sorted(p.stem for p in VOICES_DIR.glob("*.wav")), "device": device}
+
+
 @app.post("/v1/audio/speech")
 def speech(req: SpeechRequest) -> Response:
     ref = VOICES_DIR / f"{req.voice}.wav"
