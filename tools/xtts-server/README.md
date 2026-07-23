@@ -23,7 +23,13 @@ XTTS clones the voice in the reference recording.
 python server.py --lang tr --port 8020
 ```
 
-First run downloads the XTTS-v2 weights from Hugging Face (~2 GB).
+Device defaults to `cuda` if available, otherwise `cpu`. Override with `--device
+cpu|cuda|mps` or the `XTTS_DEVICE` env var (CLI wins over env). `mps` is opt-in
+only — XTTS-v2 produces broken/garbled audio on MPS in this coqui-tts version range.
+
+First run downloads the XTTS-v2 weights from Hugging Face (~2 GB) and auto-accepts
+the Coqui CPML license non-interactively (`COQUI_TOS_AGREED=1`), so it won't hang
+waiting for a prompt.
 **License note:** XTTS-v2 weights are under the Coqui CPML (non-commercial) license.
 
 ## Connect the panel
