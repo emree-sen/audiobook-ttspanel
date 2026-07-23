@@ -7,4 +7,9 @@ export const en: Record<MessageKey, string> = {
   'common.delete': 'Delete',
   'common.confirmAgain': 'Are you sure?',
   'settings.language': 'Language / Dil',
+  'sidebar.library': 'Library',
+  'sidebar.newProject': 'New project',
+  'sidebar.settings': 'Settings',
+  'sidebar.manage': 'Manage',
+  'sidebar.menu': 'Library menu',
 };

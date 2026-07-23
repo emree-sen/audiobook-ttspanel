@@ -7,5 +7,10 @@ export const tr = {
   'common.delete': 'Sil',
   'common.confirmAgain': 'Emin misin?',
   'settings.language': 'Dil / Language',
+  'sidebar.library': 'Kütüphane',
+  'sidebar.newProject': 'Yeni proje',
+  'sidebar.settings': 'Ayarlar',
+  'sidebar.manage': 'Yönet',
+  'sidebar.menu': 'Kütüphane menüsü',
 } as const;
 export type MessageKey = keyof typeof tr;
