@@ -15,6 +15,15 @@ describe('POST /api/probe', () => {
     expect(urls[0]).toBe('http://localhost:1234/v1/models');
     expect(d.ok).toBe(true);
     expect(d.detail).toContain('2');
+    expect(d.models).toEqual(['a', 'b']);
+  });
+
+  test('llm: 20 modelden fazlası kırpılır', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ id: `m${i}` }));
+    vi.stubGlobal('fetch', async () => ({ ok: true, status: 200, json: async () => ({ data: many }) }));
+    const d = await (await probeRoute.POST(jsonReq({ kind: 'llm', baseUrl: 'http://x/v1' }))).json();
+    expect(d.models).toHaveLength(20);
+    expect(d.models[0]).toBe('m0');
   });
 
   test('tts: /v1 kökünden /health okur, ses sayısını döndürür', async () => {
@@ -24,6 +33,7 @@ describe('POST /api/probe', () => {
     expect(urls[0]).toBe('http://localhost:8020/health');
     expect(d.ok).toBe(true);
     expect(d.detail).toContain('1');
+    expect(d.voices).toEqual(['deneme']);
   });
 
   test('HTTP hatası ok:false + durum kodu', async () => {

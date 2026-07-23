@@ -15,10 +15,13 @@ export async function POST(req: NextRequest) {
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return NextResponse.json({ ok: false, detail: tServer(req, 'probe.httpError', { status: res.status }) });
     const data = (await res.json().catch(() => null)) as { data?: unknown[]; voices?: unknown[] } | null;
-    const count = kind === 'llm'
-      ? (Array.isArray(data?.data) ? data.data.length : 0)
-      : (Array.isArray(data?.voices) ? data.voices.length : 0);
-    return NextResponse.json({ ok: true, detail: tServer(req, kind === 'llm' ? 'probe.okModels' : 'probe.okVoices', { count }) });
+    if (kind === 'llm') {
+      const models = (Array.isArray(data?.data) ? data.data : [])
+        .map((m) => (m as { id?: unknown }).id).filter((x): x is string => typeof x === 'string').slice(0, 20);
+      return NextResponse.json({ ok: true, detail: tServer(req, 'probe.okModels', { count: models.length }), models });
+    }
+    const voices = (Array.isArray(data?.voices) ? data.voices : []).filter((x): x is string => typeof x === 'string');
+    return NextResponse.json({ ok: true, detail: tServer(req, 'probe.okVoices', { count: voices.length }), voices });
   } catch {
     return NextResponse.json({ ok: false, detail: tServer(req, 'probe.unreachable') });
   }
