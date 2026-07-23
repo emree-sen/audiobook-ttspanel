@@ -153,6 +153,11 @@ export const tr = {
   'settings.llmHeading': 'LLM (annotation)',
   'settings.llmProviderAria': 'LLM sağlayıcısı',
   'settings.llmUsesGeminiKey': 'Gemini LLM, yukarıdaki Gemini API anahtarını kullanır.',
+  'settings.llmOpenaiCompat': 'OpenAI-uyumlu (LM Studio / lokal)',
+  'settings.llmBaseUrlPlaceholder': 'http://localhost:1234/v1',
+  'settings.llmBaseUrlAria': 'LLM sunucu adresi',
+  'settings.llmApiKeyPlaceholder': 'API anahtarı (lokalde boş bırakın)',
+  'settings.llmLocalHint': 'LM Studio, Ollama, OpenRouter gibi OpenAI-uyumlu her sunucuyla çalışır; lokal sunucularda anahtar gerekmez.',
   'settings.genderAria': 'Cinsiyet',
   'settings.toneAria': 'Ton',
   'settings.toneHintPlaceholder': 'ton (ör. olgun, anlatıcı)',
@@ -218,6 +223,8 @@ export const tr = {
   'error.chapterTextEmpty': 'Bölüm metni boş — önce ham metni kaydedin',
   'error.voicePoolEmpty': 'Aktif sağlayıcının ses havuzu boş — Ayarlar’dan ses ekleyin',
   'error.llmOutputInvalid': 'LLM çıktısı doğrulanamadı: {error}',
+  'error.llmBaseUrlMissing': 'LLM sunucu adresi yok — Ayarlar’dan girin veya .env LLM_BASE_URL tanımlayın',
+  'error.llmModelMissing': 'LLM model adı yok — Ayarlar’dan girin veya .env LLM_MODEL tanımlayın',
   'cast.narrator': 'Anlatıcı',
 } as const;
 export type MessageKey = keyof typeof tr;

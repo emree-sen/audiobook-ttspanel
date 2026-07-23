@@ -19,6 +19,8 @@ export async function GET() {
     model: getSetting(db, 'model') ?? '',
     llmProvider: getSetting(db, 'llm_provider') ?? 'gemini',
     llmModel: getSetting(db, 'llm_model') ?? '',
+    llmBaseUrl: getSetting(db, 'llm_base_url') ?? '',
+    llmApiKey: (() => { const k = getSetting(db, 'llm_api_key'); return k ? maskKey(k) : null; })(),
     piperExe: getSetting(db, 'piper_exe') ?? '',
     geminiKey: dbKey ? maskKey(dbKey) : null,
     geminiKeySource: dbKey ? 'db' : process.env.GEMINI_API_KEY ? 'env' : null,
@@ -31,8 +33,10 @@ export async function GET() {
 const putSchema = z.object({
   provider: z.string().min(1).optional(),
   model: z.string().optional(),
-  llmProvider: z.enum(['gemini', 'mock']).optional(),
+  llmProvider: z.enum(['gemini', 'mock', 'openai-compat']).optional(),
   llmModel: z.string().optional(),
+  llmBaseUrl: z.string().optional(),
+  llmApiKey: z.string().min(1).refine((v) => !v.includes('•'), 'maskeli değer kaydedilemez').nullable().optional(),
   piperExe: z.string().optional(),
   // Maskeli değerin geri yazılmasına karşı koruma: • içeren anahtar reddedilir.
   geminiKey: z.string().min(8).refine((v) => !v.includes('•'), 'maskeli değer kaydedilemez').nullable().optional(),
@@ -54,6 +58,9 @@ export async function PUT(req: NextRequest) {
   setOrDelete('model', b.model);
   if (b.llmProvider !== undefined) setSetting(db, 'llm_provider', b.llmProvider);
   setOrDelete('llm_model', b.llmModel);
+  setOrDelete('llm_base_url', b.llmBaseUrl);
+  if (b.llmApiKey === null) deleteSetting(db, 'llm_api_key');
+  else if (typeof b.llmApiKey === 'string') setSetting(db, 'llm_api_key', b.llmApiKey);
   setOrDelete('piper_exe', b.piperExe);
   if (b.geminiKey === null) deleteSetting(db, 'gemini_api_key');
   else if (typeof b.geminiKey === 'string') setSetting(db, 'gemini_api_key', b.geminiKey);

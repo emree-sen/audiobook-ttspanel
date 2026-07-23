@@ -8,6 +8,7 @@ type VoiceRow = { id: string; provider: string; voice: string; gender: string; t
 type Conn = { id: string; label: string; baseUrl: string; model: string; hasKey: boolean };
 type SettingsData = {
   provider: string; model: string; llmProvider: string; llmModel: string; piperExe: string;
+  llmBaseUrl: string; llmApiKey: string | null;
   geminiKey: string | null; geminiKeySource: 'db' | 'env' | null;
   quotaLimits: Record<string, number | null>;
   connections: Conn[]; voices: Record<string, VoiceRow[]>;
@@ -80,13 +81,15 @@ export default function SettingsPage() {
   const [modelInput, setModelInput] = useState('');
   const [piperInput, setPiperInput] = useState('');
   const [llmModelInput, setLlmModelInput] = useState('');
+  const [llmBaseInput, setLlmBaseInput] = useState('');
+  const [llmKeyInput, setLlmKeyInput] = useState('');
   const [conn, setConn] = useState({ id: '', label: '', baseUrl: '', apiKey: '', model: '' });
 
   const load = useCallback(async () => {
     const res = await fetch('/api/settings');
     if (!res.ok) { setErr(t('settings.loadError')); return; }
     const d: SettingsData = await res.json();
-    setData(d); setModelInput(d.model); setPiperInput(d.piperExe); setLlmModelInput(d.llmModel);
+    setData(d); setModelInput(d.model); setPiperInput(d.piperExe); setLlmModelInput(d.llmModel); setLlmBaseInput(d.llmBaseUrl);
   }, [t]);
   useEffect(() => { load(); }, [load]);
 
@@ -241,6 +244,7 @@ export default function SettingsPage() {
         <div className="row">
           <select value={data.llmProvider} onChange={(e) => put({ llmProvider: e.target.value })} aria-label={t('settings.llmProviderAria')}>
             <option value="gemini">Gemini</option>
+            <option value="openai-compat">{t('settings.llmOpenaiCompat')}</option>
             <option value="mock">{t('settings.mockTest')}</option>
           </select>
           <form className="row" onSubmit={async (e) => { e.preventDefault(); await put({ llmModel: llmModelInput.trim() }); }}>
@@ -248,7 +252,20 @@ export default function SettingsPage() {
             <button type="submit">{t('common.save')}</button>
           </form>
         </div>
-        <p className="muted">{t('settings.llmUsesGeminiKey')}</p>
+        {data.llmProvider === 'openai-compat' && (
+          <>
+            <form className="row" onSubmit={async (e) => {
+              e.preventDefault();
+              if (await put({ llmBaseUrl: llmBaseInput.trim(), ...(llmKeyInput.trim() ? { llmApiKey: llmKeyInput.trim() } : {}) })) setLlmKeyInput('');
+            }}>
+              <input value={llmBaseInput} onChange={(e) => setLlmBaseInput(e.target.value)} placeholder={t('settings.llmBaseUrlPlaceholder')} aria-label={t('settings.llmBaseUrlAria')} />
+              <input value={llmKeyInput} onChange={(e) => setLlmKeyInput(e.target.value)} placeholder={data.llmApiKey ?? t('settings.llmApiKeyPlaceholder')} type="password" autoComplete="off" />
+              <button type="submit">{t('common.save')}</button>
+            </form>
+            <p className="muted">{t('settings.llmLocalHint')}</p>
+          </>
+        )}
+        {data.llmProvider === 'gemini' && <p className="muted">{t('settings.llmUsesGeminiKey')}</p>}
       </div>
     </>
   );

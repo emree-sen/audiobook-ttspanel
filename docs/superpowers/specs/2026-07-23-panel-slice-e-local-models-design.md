@@ -55,7 +55,9 @@ i18n (TR/EN). Bu iş `feat/panel-i18n` merge olduktan sonra yeni dalda yapılır
 - **Sesler:** `tools/xtts-server/voices/*.wav`; dosya adı = ses adı = XTTS referans
   (klon) örneği. Kullanıcı kendi kaydını koyarak yeni ses ekler.
 - **Dil:** açılışta `--lang tr` varsayılanı; istek `language` gönderirse o kazanır.
-- **Donanım:** cihaz seçimi cuda → mps → cpu otomatik.
+- **Donanım:** cihaz seçimi cuda → cpu otomatik; mps yalnızca `--device mps` /
+  `XTTS_DEVICE=mps` ile opt-in (kod incelemesi bulgusu: XTTS bu coqui-tts aralığında
+  MPS'te sessizce bozuk ses üretebiliyor — CPU, M-serisi Mac'te güvenli varsayılan).
 - **Dosyalar:** `server.py`, `requirements.txt`, `README.md` (kurulum: pip install +
   `uvicorn server:app --port 8020`).
 - Model ağırlığı ilk çalıştırmada HF'den iner; süreç boyunca bellekte tutulur.
