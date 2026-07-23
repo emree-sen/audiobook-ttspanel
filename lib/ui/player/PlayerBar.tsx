@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation';
 import { Icon } from '../Icon';
 import { RATES, usePlayer } from './PlayerProvider';
+import { useT } from '@/lib/ui/LanguageProvider';
 
 function fmt(s: number): string {
   if (!Number.isFinite(s) || s < 0) return '0:00';
@@ -11,32 +12,33 @@ function fmt(s: number): string {
 
 export function PlayerBar() {
   const pathname = usePathname();
+  const t = useT();
   const { track, playing, position, duration, rate, toggle, seekBy, seekTo, setRate, next, hasNext } = usePlayer();
   if (!track || pathname === '/login') return null;
 
   return (
-    <div className="playerbar" role="region" aria-label="Oynatıcı">
+    <div className="playerbar" role="region" aria-label={t('player.region')}>
       <div className="pb-info">
         <span className="t">{track.title}</span>
         <span className="muted">{track.seriesTitle}</span>
       </div>
       <div className="pb-controls">
-        <button className="icon" onClick={() => seekBy(-15)} aria-label="15 saniye geri"><Icon name="back15" size={20} /></button>
-        <button className="icon pb-play" onClick={toggle} aria-label={playing ? 'Duraklat' : 'Çal'}>
+        <button className="icon" onClick={() => seekBy(-15)} aria-label={t('player.skipBack15')}><Icon name="back15" size={20} /></button>
+        <button className="icon pb-play" onClick={toggle} aria-label={playing ? t('common.pause') : t('common.play')}>
           <Icon name={playing ? 'pause' : 'play'} size={22} />
         </button>
-        <button className="icon" onClick={() => seekBy(30)} aria-label="30 saniye ileri"><Icon name="fwd30" size={20} /></button>
-        <button className="icon" onClick={next} disabled={!hasNext} aria-label="Sonraki bölüm"><Icon name="next" size={18} /></button>
+        <button className="icon" onClick={() => seekBy(30)} aria-label={t('player.skipFwd30')}><Icon name="fwd30" size={20} /></button>
+        <button className="icon" onClick={next} disabled={!hasNext} aria-label={t('player.nextChapter')}><Icon name="next" size={18} /></button>
       </div>
       <div className="pb-seek">
         <span className="mono muted">{fmt(position)}</span>
         <input
           type="range" min={0} max={Math.max(duration, 1)} step={1} value={Math.min(position, duration || position)}
-          onChange={(e) => seekTo(Number(e.target.value))} aria-label="İlerleme"
+          onChange={(e) => seekTo(Number(e.target.value))} aria-label={t('player.seek')}
         />
         <span className="mono muted">{fmt(duration)}</span>
       </div>
-      <select className="pb-rate" value={rate} onChange={(e) => setRate(Number(e.target.value))} aria-label="Oynatma hızı">
+      <select className="pb-rate" value={rate} onChange={(e) => setRate(Number(e.target.value))} aria-label={t('player.rate')}>
         {RATES.map((r) => <option key={r} value={r}>{r}x</option>)}
       </select>
     </div>

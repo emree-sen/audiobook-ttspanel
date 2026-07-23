@@ -153,7 +153,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!('mediaSession' in navigator) || !track) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title, artist: track.seriesTitle, album: 'webnovel-tts',
+      title: track.title, artist: track.seriesTitle, album: 'audiobook-ttspanel',
       artwork: [{ src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml' }],
     });
     const ms = navigator.mediaSession;

@@ -5,6 +5,7 @@ import { Icon } from '@/lib/ui/Icon';
 import { EmptyState } from '@/lib/ui/EmptyState';
 import { usePlayer, type PlayerTrack } from '@/lib/ui/player/PlayerProvider';
 import { audioUrl, downloadChapter, downloadedSet, removeDownload, storageEstimateText } from '@/lib/ui/player/offline';
+import { useT } from '@/lib/ui/LanguageProvider';
 
 type LibChapter = { id: string; title: string; position: number; status: string; renderPath: string | null; durationSec: number | null; progressSec: number | null; progressUpdatedAt: number };
 type LibSeries = { project: { id: string; title: string }; chapters: LibChapter[] };
@@ -21,6 +22,7 @@ const toTrack = (seriesTitle: string, c: LibChapter): PlayerTrack => ({
 });
 
 export default function LibraryPage() {
+  const t = useT();
   const [lib, setLib] = useState<LibSeries[] | null>(null);
   const [err, setErr] = useState('');
   const [dl, setDl] = useState<Set<string>>(new Set());
@@ -40,12 +42,12 @@ export default function LibraryPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/library');
-      if (!res.ok) { setErr((await res.json().catch(() => ({}))).error ?? 'Kütüphane yüklenemedi'); setLib([]); return; }
+      if (!res.ok) { setErr((await res.json().catch(() => ({}))).error ?? t('library.loadError')); setLib([]); return; }
       setLib(await res.json());
-    } catch { setErr('Bağlantı yok — indirilenler dışında içerik kullanılamaz'); setLib([]); }
+    } catch { setErr(t('library.offlineError')); setLib([]); }
     setDl(await downloadedSet());
     setSpace(await storageEstimateText());
-  }, []);
+  }, [t]);
   useEffect(() => { load(); }, [load]);
 
   async function toggleDownload(c: LibChapter) {
@@ -53,13 +55,13 @@ export default function LibraryPage() {
     setDlBusy(c.id); setErr('');
     try {
       if (dl.has(c.renderPath)) await removeDownload(c.renderPath);
-      else if (!(await downloadChapter(c.renderPath))) setErr('İndirilemedi — bağlantıyı kontrol et');
+      else if (!(await downloadChapter(c.renderPath))) setErr(t('library.downloadFailed'));
       setDl(await downloadedSet());
       setSpace(await storageEstimateText());
     } finally { setDlBusy(null); }
   }
 
-  if (lib === null) return <p className="muted">Yükleniyor…</p>;
+  if (lib === null) return <p className="muted">{t('common.loading')}</p>;
 
   // "Devam et": en son dinlenen, bitmemiş bölüm.
   const all = lib.flatMap((s) => s.chapters.filter((c) => c.renderPath).map((c) => ({ s, c })));
@@ -70,15 +72,15 @@ export default function LibraryPage() {
 
   return (
     <>
-      <div className="crumbs"><span className="here">Kütüphane</span></div>
-      <h1>Kütüphane {space && <span className="muted" style={{ fontSize: '0.8rem' }}>indirilenler: {space}</span>}</h1>
+      <div className="crumbs"><span className="here">{t('sidebar.library')}</span></div>
+      <h1>{t('sidebar.library')} {space && <span className="muted" style={{ fontSize: '0.8rem' }}>{t('library.downloadsLabel', { space })}</span>}</h1>
       {err && <p className="muted" role="alert"><Icon name="warn" size={14} /> {err}</p>}
 
       {cont && (() => {
         const contCurrent = track?.chapterId === cont.c.id;
         return (
           <div className="card continue">
-            <h2><Icon name="headphones" /> Devam et</h2>
+            <h2><Icon name="headphones" /> {t('library.continue')}</h2>
             <p className="row">
               <button onClick={() => (contCurrent ? toggle() : playChapter(toTrack(cont.s.project.title, cont.c), queueOf(cont.s)))}>
                 <Icon name={contCurrent && playing ? 'pause' : 'play'} /> {cont.c.title}
@@ -90,7 +92,7 @@ export default function LibraryPage() {
       })()}
 
       {lib.length === 0 && !err && (
-        <EmptyState icon="headphones" title="Henüz dinlenecek bölüm yok">Bir bölümü üretip birleştirdiğinde burada görünür.</EmptyState>
+        <EmptyState icon="headphones" title={t('library.emptyTitle')}>{t('library.emptyBody')}</EmptyState>
       )}
 
       {lib.map((s) => (
@@ -106,11 +108,11 @@ export default function LibraryPage() {
                   <span className="pos mono">{c.position}</span>
                   {playable ? (
                     <button className="icon" onClick={() => (isCurrent ? toggle() : playChapter(toTrack(s.project.title, c), queueOf(s)))}
-                      aria-label={isCurrent && playing ? 'Duraklat' : 'Çal'}>
+                      aria-label={isCurrent && playing ? t('common.pause') : t('common.play')}>
                       <Icon name={isCurrent && playing ? 'pause' : 'play'} size={15} />
                     </button>
                   ) : (
-                    <span title={c.status === 'voiced' ? 'Önce Birleştir' : 'Çevrimdışı — indirilmedi'}><Icon name="warn" size={13} /></span>
+                    <span title={c.status === 'voiced' ? t('library.stitchFirst') : t('library.offlineNotDownloaded')}><Icon name="warn" size={13} /></span>
                   )}
                   <span className="name">{c.title}</span>
                   {isCurrent && playing && <span className="eq" aria-hidden="true"><span /><span /><span /><span /><span /></span>}
@@ -118,15 +120,15 @@ export default function LibraryPage() {
                     <span className="tools">
                       <span className="muted mono">{pct != null ? `%${pct}` : ''} {fmt(c.durationSec)}</span>
                       <button className="icon" onClick={() => toggleDownload(c)} disabled={dlBusy !== null}
-                        aria-label={dl.has(c.renderPath!) ? 'İndirileni sil' : 'Offline için indir'}
-                        title={dl.has(c.renderPath!) ? 'İndirildi — silmek için tıkla' : 'Offline için indir'}>
+                        aria-label={dl.has(c.renderPath!) ? t('library.deleteDownload') : t('library.download')}
+                        title={dl.has(c.renderPath!) ? t('library.downloadedTapToDelete') : t('library.download')}>
                         {dlBusy === c.id ? <Icon name="spinner" size={14} /> : <Icon name={dl.has(c.renderPath!) ? 'check' : 'download'} size={14} />}
                       </button>
                     </span>
                   ) : c.status === 'voiced' ? (
-                    <span className="tools"><Link className="muted" href={`/chapters/${c.id}`}>Birleştir bekliyor →</Link></span>
+                    <span className="tools"><Link className="muted" href={`/chapters/${c.id}`}>{t('library.awaitingStitch')}</Link></span>
                   ) : (
-                    <span className="tools"><span className="muted">çevrimdışı — indirilmedi</span></span>
+                    <span className="tools"><span className="muted">{t('library.offlineNotDownloaded')}</span></span>
                   )}
                 </div>
               );
