@@ -267,9 +267,17 @@ export default function SettingsPage() {
         <h2><Icon name="speaker" /> {t('settings.xttsHeading')}</h2>
         <div className="row">
           {xtts.state === 'stopped' || xtts.state === 'error' ? (
-            <button onClick={async () => { await fetch('/api/xtts', { method: 'POST' }); await refreshXtts(); }}>{t('settings.xttsStart')}</button>
+            <button onClick={async () => {
+              const res = await fetch('/api/xtts', { method: 'POST' });
+              if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.saveError'));
+              await refreshXtts();
+            }}>{t('settings.xttsStart')}</button>
           ) : (
-            <button className="ghost" onClick={async () => { await fetch('/api/xtts', { method: 'DELETE' }); await refreshXtts(); }}>{t('settings.xttsStop')}</button>
+            <button className="ghost" onClick={async () => {
+              const res = await fetch('/api/xtts', { method: 'DELETE' });
+              if (!res.ok) setErr((await res.json().catch(() => ({})) as { error?: string }).error ?? t('settings.saveError'));
+              await refreshXtts();
+            }}>{t('settings.xttsStop')}</button>
           )}
           <span className="muted">
             {xtts.state === 'stopped' && t('settings.xttsState.stopped')}
@@ -279,7 +287,7 @@ export default function SettingsPage() {
           </span>
         </div>
         {xtts.log.length > 0 && xtts.state !== 'stopped' && (
-          <pre className="muted" style={{ maxHeight: '8rem', overflow: 'auto', fontSize: '0.75rem' }}>{xtts.log.slice(-12).join('\n')}</pre>
+          <pre className="mono muted" style={{ maxHeight: '8rem', overflow: 'auto', fontSize: '0.75rem' }}>{xtts.log.slice(-12).join('\n')}</pre>
         )}
         <p className="muted">{t('settings.xttsHint')}</p>
       </div>
